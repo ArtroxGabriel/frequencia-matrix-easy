@@ -1,0 +1,44 @@
+services:
+  frequencia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frequencia-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/frequencia.db
+      - DEV_MODE=true
+    volumes:
+      - frequencia_data:/app/data
+
+  conduit:
+    image: matrixconduit/matrix-conduit:latest
+    container_name: frequencia-conduit
+    restart: unless-stopped
+    ports:
+      - "6167:6167"
+    environment:
+      - CONDUIT_SERVER_NAME=localhost
+      - CONDUIT_PORT=6167
+      - CONDUIT_MAX_REQUEST_SIZE=20000000
+      - CONDUIT_ALLOW_REGISTRATION=true
+      - CONDUIT_ALLOW_FEDERATION=false
+      - CONDUIT_DATABASE_BACKEND=sqlite
+    volumes:
+      - conduit_data:/var/lib/matrix-conduit
+
+  element:
+    image: vectorim/element-web:latest
+    container_name: frequencia-element
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - conduit
+
+volumes:
+  frequencia_data:
+  conduit_data:
