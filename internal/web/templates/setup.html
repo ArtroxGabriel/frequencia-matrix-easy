@@ -1,0 +1,71 @@
+<div class="space-y-6">
+    <div class="border-b border-slate-200 pb-3">
+        <h2 class="text-lg font-semibold text-slate-800">Configuração da Disciplina</h2>
+        <p class="text-xs text-slate-500">Defina o nome, os dias de aula na semana e a carga horária total do semestre.</p>
+    </div>
+
+    {{if .Message}}
+    <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-sm">
+        {{.Message}}
+    </div>
+    {{end}}
+
+    <form hx-post="/widget/setup?roomId={{.RoomID}}&openIdToken={{.Token}}"
+          hx-target="#tab-content"
+          class="space-y-4 max-w-lg">
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nome da Disciplina</label>
+            <input type="text" name="courseName" value="{{.Course.CourseName}}" required
+                   class="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                   placeholder="Ex: Sistemas Distribuídos">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Total de Períodos / Aulas no Semestre</label>
+            <input type="number" name="totalPeriods" value="{{if .Course.TotalPeriods}}{{.Course.TotalPeriods}}{{else}}32{{end}}" min="1" required
+                   class="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
+                   placeholder="Ex: 32">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Data de Início das Aulas</label>
+            <input type="date" name="startDate" value="{{.StartDateFormatted}}" required
+                   class="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">Dias de Aula</label>
+            <div class="grid grid-cols-3 gap-2 text-sm">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="1" {{if index .WeekdayChecked 1}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Segunda</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="2" {{if index .WeekdayChecked 2}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Terça</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="3" {{if index .WeekdayChecked 3}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Quarta</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="4" {{if index .WeekdayChecked 4}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Quinta</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="5" {{if index .WeekdayChecked 5}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Sexta</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="weekdays" value="6" {{if index .WeekdayChecked 6}}checked{{end}} class="rounded text-indigo-600">
+                    <span>Sábado</span>
+                </label>
+            </div>
+        </div>
+
+        <button type="submit"
+                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition">
+            💾 Salvar Configurações
+        </button>
+    </form>
+</div>

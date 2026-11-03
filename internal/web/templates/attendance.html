@@ -1,0 +1,94 @@
+<div class="space-y-6">
+    <div class="border-b border-slate-200 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+            <h2 class="text-lg font-semibold text-slate-800">Chamada Diária</h2>
+            <p class="text-xs text-slate-500">Faça a chamada dos alunos presentes na aula de hoje ou na data selecionada.</p>
+        </div>
+        <div>
+            <input type="date" value="{{.SelectedDate}}"
+                   hx-get="/widget/tab/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+                   hx-target="#tab-content"
+                   name="date"
+                   class="px-2.5 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+    </div>
+
+    {{if .Message}}
+    <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-sm flex items-center justify-between">
+        <span>{{.Message}}</span>
+        <span class="text-xs text-emerald-600">Mensagem postada na sala Matrix!</span>
+    </div>
+    {{end}}
+
+    <form hx-post="/widget/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+          hx-target="#tab-content"
+          class="space-y-6">
+        <input type="hidden" name="classDate" value="{{.SelectedDate}}">
+        
+        <div class="flex items-center space-x-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <span class="text-xs font-semibold text-slate-700 uppercase">Períodos desta aula:</span>
+            <label class="flex items-center space-x-1 text-sm">
+                <input type="radio" name="periodCount" value="1" {{if eq .PeriodCount 1}}checked{{end}} class="text-indigo-600">
+                <span>1 período (50 min)</span>
+            </label>
+            <label class="flex items-center space-x-1 text-sm">
+                <input type="radio" name="periodCount" value="2" {{if ne .PeriodCount 1}}checked{{end}} class="text-indigo-600">
+                <span>2 períodos (100 min)</span>
+            </label>
+        </div>
+
+        <!-- Student Attendance Checklists -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Graduation -->
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+                <div class="bg-indigo-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-indigo-950">
+                    Graduação ({{len .GradStudents}})
+                </div>
+                <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                    {{range .GradStudents}}
+                    <label class="px-4 py-3 flex items-center justify-between hover:bg-indigo-50/50 cursor-pointer transition select-none">
+                        <div>
+                            <span class="font-medium text-sm text-slate-800">{{.FullName}}</span>
+                            {{if .RegistrationNumber}}<span class="text-xs text-slate-400 ml-2">({{.RegistrationNumber}})</span>{{end}}
+                        </div>
+                        <input type="checkbox" name="present" value="{{.ID}}"
+                               {{if index $.PresentMap .ID}}checked{{end}}
+                               class="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
+                    </label>
+                    {{else}}
+                    <div class="p-4 text-center text-xs text-slate-400">Nenhum aluno cadastrado.</div>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Pos-Graduation -->
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+                <div class="bg-purple-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-purple-950">
+                    Pós-Graduação ({{len .PosGradStudents}})
+                </div>
+                <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                    {{range .PosGradStudents}}
+                    <label class="px-4 py-3 flex items-center justify-between hover:bg-purple-50/50 cursor-pointer transition select-none">
+                        <div>
+                            <span class="font-medium text-sm text-slate-800">{{.FullName}}</span>
+                            {{if .RegistrationNumber}}<span class="text-xs text-slate-400 ml-2">({{.RegistrationNumber}})</span>{{end}}
+                        </div>
+                        <input type="checkbox" name="present" value="{{.ID}}"
+                               {{if index $.PresentMap .ID}}checked{{end}}
+                               class="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
+                    </label>
+                    {{else}}
+                    <div class="p-4 text-center text-xs text-slate-400">Nenhum aluno cadastrado.</div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit"
+                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium text-sm shadow transition flex items-center space-x-2">
+                <span>💾 Salvar Chamada do Dia</span>
+            </button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso Restrito</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4 text-slate-800">
+    <div class="max-w-md w-full bg-white p-6 rounded-xl shadow-md border border-slate-200 text-center">
+        <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+            🔒
+        </div>
+        <h2 class="text-xl font-bold text-slate-900 mb-2">Acesso restrito ao professor</h2>
+        <p class="text-sm text-slate-600 mb-6">
+            Apenas moderadores e administradores da sala Matrix (nível de poder $\ge 50$) têm permissão para configurar aulas, gerenciar alunos e registrar presença.
+        </p>
+        <div class="bg-slate-100 p-3 rounded text-xs text-slate-500 font-mono break-all text-left">
+            <div><strong>Usuário:</strong> {{.UserID}}</div>
+            <div><strong>Sala:</strong> {{.RoomID}}</div>
+        </div>
+    </div>
+</body>
+</html>
