@@ -4,12 +4,12 @@ Integração de chamada e controle de frequência para salas Matrix e Element We
 
 ## Visão Geral
 
-- **Controle de Acesso por Papel na Sala (Teacher-Only)**: Inspeciona o estado da sala Matrix (`m.room.power_levels`). Usuários com nível de poder $\ge 50$ (Moderadores / Professores) têm acesso total. Alunos (nível $0$) recebem tela explicativa de acesso restrito.
+- **Controle de Acesso por Papel na Sala (Teacher-Only)**: Inspeciona o estado da sala Matrix (`m.room.power_levels`). Usuários com nível de poder &ge; 50 (Moderadores / Professores) têm acesso total. Alunos (nível 0) recebem tela explicativa de acesso restrito.
 - **Configuração da Disciplina**: Definição de dias da semana (ex: Terça/Quinta), data de início e total de períodos letivos planejados no semestre.
 - **Quadro de Alunos**: Cadastro e remoção de alunos em duas categorias independentes: **Graduação** e **Pós-Graduação**. Ordenação alfabética insensível a acentos (ex: *Érika* tratada como *Erika*).
 - **Chamada Diária Interativa**: Widget visual embutido via HTMX/Tailwind no Element para realização da chamada em tempo real durante a aula.
 - **Notificação na Sala**: Ao salvar a chamada, um aviso (`m.notice`) é postado na sala Matrix com o resumo de presenças da data.
-- **Exportação XLSX de Fim de Semestre**: Gera planilha Excel `.xlsx` com duas abas (`Graduacao` e `Pos-Graduacao`), alunos em ordem alfabética A-Z, colunas dinâmicas por dia de aula (`P`/`F`), totais e cálculo de aprovação por frequência ($\ge 75\%$).
+- **Exportação XLSX de Fim de Semestre**: Gera planilha Excel `.xlsx` com duas abas (`Graduacao` e `Pos-Graduacao`), alunos em ordem alfabética A-Z, colunas dinâmicas por dia de aula (`P`/`F`), totais e cálculo de aprovação por frequência (&ge; 75%).
 - **Persistência Confiável e Leve**: SQLite puro Go (`modernc.org/sqlite`, sem dependência de CGO) com modo WAL (`Write-Ahead Logging`) e migrações SQL embutidas no binário.
 - **Container Estático Ultraleve**: Imagem Docker multi-stage construída sobre `FROM scratch` executando com usuário não-privilegiado `10001:10001`.
 

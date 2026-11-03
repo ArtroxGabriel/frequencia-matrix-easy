@@ -1,23 +1,23 @@
-version: '3'
+version: "3"
 
 tasks:
   test:
     desc: Run all tests with race detector and coverage profile
     cmds:
-      - rtk go test -v -race -coverprofile=coverage.out ./...
-      - rtk go tool cover -func=coverage.out
+      - go test -v -race -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out
 
   lint:
     desc: Run golangci-lint
     cmds:
-      - rtk golangci-lint run
+      - golangci-lint run
 
   dev:
     desc: Run server in local development mode
     cmds:
-      - DEV_MODE=true rtk go run ./cmd/server
+      - DEV_MODE=true go run ./cmd/server
 
   build:
     desc: Build static binary
     cmds:
-      - CGO_ENABLED=0 rtk go build -trimpath -ldflags '-s -w -extldflags "-static"' -o bin/server ./cmd/server
+      - CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -extldflags "-static"' -o bin/server ./cmd/server
