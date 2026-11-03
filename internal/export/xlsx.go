@@ -22,12 +22,12 @@ type ColumnHeader struct {
 
 func ExportAttendanceXLSX(course domain.CourseConfig, students []domain.Student, sessions []domain.AttendanceSession) ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gradStudents, posGradStudents := domain.SortAndGroupStudents(students)
 
-	f.SetSheetName("Sheet1", SheetGraduacao)
-	f.NewSheet(SheetPosGraduacao)
+	_ = f.SetSheetName("Sheet1", SheetGraduacao)
+	_, _ = f.NewSheet(SheetPosGraduacao)
 
 	headerStyle, err := createHeaderStyle(f)
 	if err != nil {
@@ -61,10 +61,10 @@ func populateSheet(f *excelize.File, sheet string, students []domain.Student, se
 	headers := buildHeaders(sessions)
 	for colIdx, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
-		f.SetCellValue(sheet, cell, h.Title)
-		f.SetCellStyle(sheet, cell, cell, headerStyle)
+		_ = f.SetCellValue(sheet, cell, h.Title)
+		_ = f.SetCellStyle(sheet, cell, cell, headerStyle)
 		colName, _ := excelize.ColumnNumberToName(colIdx + 1)
-		f.SetColWidth(sheet, colName, colName, h.Width)
+		_ = f.SetColWidth(sheet, colName, colName, h.Width)
 	}
 
 	for rowIdx, stu := range students {
@@ -107,31 +107,31 @@ func formatDateHeader(dateStr string) string {
 
 func writeStudentRow(f *excelize.File, sheet string, rowNum int, summary domain.StudentSummary, sessions []domain.AttendanceSession) error {
 	col := 1
-	f.SetCellValue(sheet, cellName(col, rowNum), rowNum-1)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), rowNum-1)
 	col++
-	f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.FullName)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.FullName)
 	col++
-	f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.RegistrationNumber)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.RegistrationNumber)
 	col++
 
 	for _, sess := range sessions {
 		mark := getAttendanceMark(sess, summary.Student.ID)
-		f.SetCellValue(sheet, cellName(col, rowNum), mark)
+		_ = f.SetCellValue(sheet, cellName(col, rowNum), mark)
 		col++
 	}
 
-	f.SetCellValue(sheet, cellName(col, rowNum), summary.Presences)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Presences)
 	col++
-	f.SetCellValue(sheet, cellName(col, rowNum), summary.Absences)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Absences)
 	col++
-	f.SetCellValue(sheet, cellName(col, rowNum), fmt.Sprintf("%.1f%%", summary.AttendancePercent))
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), fmt.Sprintf("%.1f%%", summary.AttendancePercent))
 	col++
 
 	situacao := "Reprovado por Falta"
 	if summary.IsApproved {
 		situacao = "Aprovado por Frequência"
 	}
-	f.SetCellValue(sheet, cellName(col, rowNum), situacao)
+	_ = f.SetCellValue(sheet, cellName(col, rowNum), situacao)
 	return nil
 }
 

@@ -47,9 +47,10 @@ func SortAndGroupStudents(students []Student) ([]Student, []Student) {
 	posGrad := make([]Student, 0, len(students))
 
 	for _, s := range students {
-		if s.Level == LevelGraduation {
+		switch s.Level {
+		case LevelGraduation:
 			grad = append(grad, s)
-		} else if s.Level == LevelPosGraduation {
+		case LevelPosGraduation:
 			posGrad = append(posGrad, s)
 		}
 	}

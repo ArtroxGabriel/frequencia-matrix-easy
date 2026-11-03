@@ -53,7 +53,7 @@ func (m *MautrixGateway) VerifyUser(ctx context.Context, roomID string, openIDTo
 	if err != nil {
 		return UserIdentity{}, fmt.Errorf("failed verifying openid token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return UserIdentity{}, fmt.Errorf("%w: token verification failed with status %d", ErrUnauthorized, resp.StatusCode)

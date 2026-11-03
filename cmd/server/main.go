@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed initializing database: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	gw, err := createMatrixGateway(cfg)
 	if err != nil {

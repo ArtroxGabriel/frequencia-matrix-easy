@@ -31,7 +31,7 @@ func NewStore(dbPath string) (*Store, error) {
 	}
 
 	if err := applyPragmas(db, dbPath); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -39,7 +39,7 @@ func NewStore(dbPath string) (*Store, error) {
 	defer cancel()
 
 	if err := RunMigrations(ctx, db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed running migrations: %w", err)
 	}
 
@@ -158,7 +158,7 @@ func (s *Store) ListStudents(ctx context.Context, roomID string, activeOnly bool
 	if err != nil {
 		return nil, fmt.Errorf("failed listing students for room %s: %w", roomID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var students []domain.Student
 	for rows.Next() {
@@ -195,7 +195,7 @@ func (s *Store) RecordAttendanceSession(ctx context.Context, session domain.Atte
 	if err != nil {
 		return fmt.Errorf("failed starting tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	sessionID, err := upsertSessionHeader(ctx, tx, session)
 	if err != nil {
@@ -246,7 +246,7 @@ func replaceSessionEntries(ctx context.Context, tx *sql.Tx, sessionID string, en
 	if err != nil {
 		return fmt.Errorf("failed preparing entry insert: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for _, e := range entries {
 		if _, err := stmt.ExecContext(ctx, sessionID, e.StudentID, e.IsPresent); err != nil {
@@ -267,7 +267,7 @@ func (s *Store) ListAttendanceSessions(ctx context.Context, roomID string) ([]do
 	for rows.Next() {
 		var sess domain.AttendanceSession
 		if err := rows.Scan(&sess.ID, &sess.RoomID, &sess.ClassDate, &sess.PeriodCount, &sess.CreatedAt); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, fmt.Errorf("failed scanning session row: %w", err)
 		}
 		sessions = append(sessions, sess)
@@ -315,7 +315,7 @@ func (s *Store) getSessionEntries(ctx context.Context, sessionID string) ([]doma
 	if err != nil {
 		return nil, fmt.Errorf("failed querying entries for session %s: %w", sessionID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []domain.AttendanceEntry
 	for rows.Next() {

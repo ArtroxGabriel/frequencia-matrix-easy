@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"testing"
 )
 
@@ -41,16 +40,10 @@ func TestConfigDefaultsAndValidation(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv(t *testing.T) {
-	os.Setenv("PORT", "9090")
-	os.Setenv("DB_PATH", "custom/path.db")
-	os.Setenv("DEV_MODE", "true")
-	os.Setenv("MATRIX_HOMESERVER_URL", "https://matrix.org/")
-	defer func() {
-		os.Unsetenv("PORT")
-		os.Unsetenv("DB_PATH")
-		os.Unsetenv("DEV_MODE")
-		os.Unsetenv("MATRIX_HOMESERVER_URL")
-	}()
+	t.Setenv("PORT", "9090")
+	t.Setenv("DB_PATH", "custom/path.db")
+	t.Setenv("DEV_MODE", "true")
+	t.Setenv("MATRIX_HOMESERVER_URL", "https://matrix.org/")
 
 	cfg := LoadConfig()
 	if cfg.Port != 9090 {

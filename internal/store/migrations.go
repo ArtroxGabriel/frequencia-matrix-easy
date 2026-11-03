@@ -67,7 +67,7 @@ func applyMigrationFile(ctx context.Context, db *sql.DB, filename string) error 
 	if err != nil {
 		return fmt.Errorf("failed to begin migration transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	statements := strings.Split(string(content), ";")
 	for _, stmt := range statements {

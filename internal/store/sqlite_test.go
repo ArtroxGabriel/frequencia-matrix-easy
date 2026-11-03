@@ -15,7 +15,7 @@ func TestStoreCourseConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create in-memory store: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course1:matrix.dc.ufc.br"
 
@@ -65,7 +65,7 @@ func TestStoreStudents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course2:matrix.dc.ufc.br"
 
@@ -123,7 +123,7 @@ func TestStoreAttendanceSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course3:matrix.dc.ufc.br"
 
@@ -187,7 +187,7 @@ func TestStoreErrorCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	// Deactivate non-existent student
 	if err := s.DeactivateStudent(ctx, "!room:matrix.org", "no-id"); err != store.ErrNotFound {

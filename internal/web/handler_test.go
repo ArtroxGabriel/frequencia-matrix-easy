@@ -32,7 +32,7 @@ func setupTestServer(t *testing.T) (*store.Store, *matrix.FakeMatrixClient, http
 
 func TestHandlerUnauthorized(t *testing.T) {
 	s, fakeMatrix, handler := setupTestServer(t)
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course:matrix.dc.ufc.br"
 	studentID := "@student:matrix.dc.ufc.br"
@@ -58,7 +58,7 @@ func TestHandlerUnauthorized(t *testing.T) {
 
 func TestHandlerCourseSetup(t *testing.T) {
 	s, fakeMatrix, handler := setupTestServer(t)
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course:matrix.dc.ufc.br"
 	teacherID := "@prof:matrix.dc.ufc.br"
@@ -97,7 +97,7 @@ func TestHandlerCourseSetup(t *testing.T) {
 
 func TestHandlerStudentAndAttendanceWorkflow(t *testing.T) {
 	s, fakeMatrix, handler := setupTestServer(t)
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course:matrix.dc.ufc.br"
 	teacherID := "@prof:matrix.dc.ufc.br"
@@ -188,7 +188,7 @@ func TestHandlerStudentAndAttendanceWorkflow(t *testing.T) {
 
 func TestHandlerTabsAndViews(t *testing.T) {
 	s, fakeMatrix, handler := setupTestServer(t)
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	roomID := "!course:matrix.dc.ufc.br"
 	teacherID := "@prof:matrix.dc.ufc.br"
@@ -246,5 +246,45 @@ func TestHandlerTabsAndViews(t *testing.T) {
 	handler.ServeHTTP(recSummaryTab, reqSummaryTab)
 	if recSummaryTab.Code != http.StatusOK {
 		t.Errorf("expected 200 for summary tab, got %d", recSummaryTab.Code)
+	}
+}
+
+func TestHandlerErrorBranches(t *testing.T) {
+	s, fakeMatrix, handler := setupTestServer(t)
+	defer func() { _ = s.Close() }()
+
+	roomID := "!course:matrix.dc.ufc.br"
+	teacherID := "@prof:matrix.dc.ufc.br"
+	fakeMatrix.SetUserPowerLevel(roomID, teacherID, 100)
+	fakeMatrix.RegisterOpenIDToken("teacher-token", matrix.UserIdentity{
+		UserID: teacherID,
+		RoomID: roomID,
+	})
+	authQuery := "?roomId=" + url.QueryEscape(roomID) + "&openIdToken=teacher-token"
+
+	// Add student with invalid name
+	badStuForm := url.Values{
+		"fullName": {"   "},
+		"level":    {string(domain.LevelGraduation)},
+	}
+	reqBadStu := httptest.NewRequest(http.MethodPost, "/widget/students"+authQuery, strings.NewReader(badStuForm.Encode()))
+	reqBadStu.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recBadStu := httptest.NewRecorder()
+	handler.ServeHTTP(recBadStu, reqBadStu)
+	if recBadStu.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request for whitespace name, got %d", recBadStu.Code)
+	}
+
+	// Attendance with default period count when periodCount <= 0
+	attForm := url.Values{
+		"classDate":   {"2026-03-03"},
+		"periodCount": {"0"},
+	}
+	reqAtt := httptest.NewRequest(http.MethodPost, "/widget/attendance"+authQuery, strings.NewReader(attForm.Encode()))
+	reqAtt.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recAtt := httptest.NewRecorder()
+	handler.ServeHTTP(recAtt, reqAtt)
+	if recAtt.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for attendance with default periodCount, got %d", recAtt.Code)
 	}
 }

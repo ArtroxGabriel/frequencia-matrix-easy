@@ -58,7 +58,7 @@ func TestExportAttendanceXLSX(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open generated xlsx: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Verify sheets exist
 	sheetList := f.GetSheetList()
