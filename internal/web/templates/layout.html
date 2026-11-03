@@ -46,7 +46,11 @@
 
         <!-- Dynamic Content Area -->
         <main id="tab-content" class="p-6">
-            {{template "tab_content" .}}
+            {{if .IsSetupTab}}
+                {{template "setup.html" .}}
+            {{else}}
+                {{template "attendance.html" .}}
+            {{end}}
         </main>
     </div>
 </body>

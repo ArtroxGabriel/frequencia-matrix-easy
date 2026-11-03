@@ -287,4 +287,19 @@ func TestHandlerErrorBranches(t *testing.T) {
 	if recAtt.Code != http.StatusOK {
 		t.Errorf("expected 200 OK for attendance with default periodCount, got %d", recAtt.Code)
 	}
+
+	// Verify unauthorized access then immediate index access works without template panic
+	reqUnauth := httptest.NewRequest(http.MethodGet, "/?roomId="+url.QueryEscape(roomID)+"&openIdToken=invalid-token", nil)
+	recUnauth := httptest.NewRecorder()
+	handler.ServeHTTP(recUnauth, reqUnauth)
+	if recUnauth.Code != http.StatusForbidden {
+		t.Errorf("expected 403 Forbidden for invalid token, got %d", recUnauth.Code)
+	}
+
+	reqIndexAfter := httptest.NewRequest(http.MethodGet, "/"+authQuery, nil)
+	recIndexAfter := httptest.NewRecorder()
+	handler.ServeHTTP(recIndexAfter, reqIndexAfter)
+	if recIndexAfter.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for index after unauthorized request, got %d", recIndexAfter.Code)
+	}
 }

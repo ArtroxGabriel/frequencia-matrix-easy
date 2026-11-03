@@ -99,17 +99,13 @@ func (h *Handler) renderUnauthorized(w http.ResponseWriter, roomID, userID strin
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	data := h.buildAttendanceData(r.Context(), ident.RoomID, token, ident.UserID, cfg, time.Now().Format("2006-01-02"), "")
-
-	tName := "attendance.html"
+	var data map[string]any
 	if cfg.RoomID == "" {
-		tName = "setup.html"
 		data = h.buildSetupData(ident.RoomID, token, ident.UserID, cfg, "")
+	} else {
+		data = h.buildAttendanceData(r.Context(), ident.RoomID, token, ident.UserID, cfg, time.Now().Format("2006-01-02"), "")
 	}
-
-	clone, _ := h.tmpl.Clone()
-	_ = template.Must(clone.Parse(fmt.Sprintf(`{{define "tab_content"}}{{template "%s" .}}{{end}}`, tName)))
-	_ = clone.ExecuteTemplate(w, "layout.html", data)
+	_ = h.tmpl.ExecuteTemplate(w, "layout.html", data)
 }
 
 func (h *Handler) handleTabSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
@@ -309,6 +305,7 @@ func (h *Handler) buildSetupData(roomID, token, userID string, cfg domain.Course
 		"WeekdayChecked":     weekdayChecked,
 		"StartDateFormatted": startFormatted,
 		"Message":            msg,
+		"IsSetupTab":         true,
 	}
 }
 
@@ -351,5 +348,6 @@ func (h *Handler) buildAttendanceData(ctx context.Context, roomID, token, userID
 		"GradStudents":    grad,
 		"PosGradStudents": posGrad,
 		"Message":         msg,
+		"IsSetupTab":      false,
 	}
 }
