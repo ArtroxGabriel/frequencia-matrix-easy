@@ -3,6 +3,7 @@ package export
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"time"
 
 	"frequencia-matrix-integration/internal/domain"
@@ -15,16 +16,12 @@ const (
 	SheetPosGraduacao = "Pos-Graduacao"
 )
 
-type ColumnHeader struct {
-	Title string
-	Width float64
-}
-
 func ExportAttendanceXLSX(course domain.CourseConfig, students []domain.Student, sessions []domain.AttendanceSession) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
 	gradStudents, posGradStudents := domain.SortAndGroupStudents(students)
+	classDates := resolveClassDates(course, sessions)
 
 	_ = f.SetSheetName("Sheet1", SheetGraduacao)
 	_, _ = f.NewSheet(SheetPosGraduacao)
@@ -34,11 +31,10 @@ func ExportAttendanceXLSX(course domain.CourseConfig, students []domain.Student,
 		return nil, fmt.Errorf("failed creating header style: %w", err)
 	}
 
-	if err := populateSheet(f, SheetGraduacao, gradStudents, sessions, course.TotalPeriods, headerStyle); err != nil {
+	if err := populateSheet(f, SheetGraduacao, gradStudents, classDates, sessions, course.TotalPeriods, headerStyle); err != nil {
 		return nil, err
 	}
-
-	if err := populateSheet(f, SheetPosGraduacao, posGradStudents, sessions, course.TotalPeriods, headerStyle); err != nil {
+	if err := populateSheet(f, SheetPosGraduacao, posGradStudents, classDates, sessions, course.TotalPeriods, headerStyle); err != nil {
 		return nil, err
 	}
 
@@ -57,82 +53,110 @@ func createHeaderStyle(f *excelize.File) (int, error) {
 	})
 }
 
-func populateSheet(f *excelize.File, sheet string, students []domain.Student, sessions []domain.AttendanceSession, totalPeriods int, headerStyle int) error {
-	headers := buildHeaders(sessions)
-	for colIdx, h := range headers {
-		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
-		_ = f.SetCellValue(sheet, cell, h.Title)
-		_ = f.SetCellStyle(sheet, cell, cell, headerStyle)
-		colName, _ := excelize.ColumnNumberToName(colIdx + 1)
-		_ = f.SetColWidth(sheet, colName, colName, h.Width)
+func resolveClassDates(course domain.CourseConfig, sessions []domain.AttendanceSession) []string {
+	dateMap := make(map[string]bool)
+	if !course.StartDate.IsZero() && len(course.Weekdays) > 0 && course.TotalPeriods > 0 {
+		schedDates := domain.CalculateClassDates(course.StartDate, course.Weekdays, course.TotalPeriods)
+		for _, d := range schedDates {
+			dateMap[d.Format("2006-01-02")] = true
+		}
+	}
+	for _, sess := range sessions {
+		if sess.ClassDate != "" {
+			dateMap[sess.ClassDate] = true
+		}
 	}
 
-	for rowIdx, stu := range students {
-		summary := domain.CalculateStudentSummary(stu, sessions, totalPeriods)
-		if err := writeStudentRow(f, sheet, rowIdx+2, summary, sessions); err != nil {
-			return err
+	uniqueDates := make([]string, 0, len(dateMap))
+	for d := range dateMap {
+		uniqueDates = append(uniqueDates, d)
+	}
+	sort.Strings(uniqueDates)
+	return uniqueDates
+}
+
+func populateSheet(f *excelize.File, sheet string, students []domain.Student, classDates []string, sessions []domain.AttendanceSession, totalPeriods int, headerStyle int) error {
+	colNameA, _ := excelize.ColumnNumberToName(1)
+	_ = f.SetColWidth(sheet, colNameA, colNameA, 14)
+	_ = f.SetCellValue(sheet, cellName(1, 1), "Data")
+	_ = f.SetCellStyle(sheet, cellName(1, 1), cellName(1, 1), headerStyle)
+
+	for i, stu := range students {
+		colIdx := i + 2
+		colName, _ := excelize.ColumnNumberToName(colIdx)
+		_ = f.SetColWidth(sheet, colName, colName, 28)
+
+		headerTitle := stu.FullName
+		if stu.RegistrationNumber != "" {
+			headerTitle = fmt.Sprintf("%s (%s)", stu.FullName, stu.RegistrationNumber)
+		}
+		cell := cellName(colIdx, 1)
+		_ = f.SetCellValue(sheet, cell, headerTitle)
+		_ = f.SetCellStyle(sheet, cell, cell, headerStyle)
+	}
+
+	sessionByDate := make(map[string]domain.AttendanceSession, len(sessions))
+	for _, s := range sessions {
+		sessionByDate[s.ClassDate] = s
+	}
+
+	for rowIdx, dateStr := range classDates {
+		excelRow := rowIdx + 2
+		_ = f.SetCellValue(sheet, cellName(1, excelRow), formatDateDisplay(dateStr))
+
+		sess, hasSess := sessionByDate[dateStr]
+		for colIdx, stu := range students {
+			mark := "-"
+			if hasSess {
+				mark = getAttendanceMark(sess, stu.ID)
+			}
+			_ = f.SetCellValue(sheet, cellName(colIdx+2, excelRow), mark)
+		}
+	}
+
+	summaryStartRow := len(classDates) + 2
+	return writeSummaryRows(f, sheet, summaryStartRow, students, sessions, totalPeriods)
+}
+
+func writeSummaryRows(f *excelize.File, sheet string, startRow int, students []domain.Student, sessions []domain.AttendanceSession, totalPeriods int) error {
+	summaries := make([]domain.StudentSummary, len(students))
+	for i, stu := range students {
+		summaries[i] = domain.CalculateStudentSummary(stu, sessions, totalPeriods)
+	}
+
+	type summaryLine struct {
+		label    string
+		getValue func(s domain.StudentSummary) any
+	}
+
+	lines := []summaryLine{
+		{label: "Presenças", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%d", s.Presences) }},
+		{label: "Faltas", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%d", s.Absences) }},
+		{label: "% Frequência", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%.1f%%", s.AttendancePercent) }},
+		{label: "Situação", getValue: func(s domain.StudentSummary) any {
+			if s.IsApproved {
+				return "Aprovado por Frequência"
+			}
+			return "Reprovado por Falta"
+		}},
+	}
+
+	for lineIdx, line := range lines {
+		row := startRow + lineIdx
+		_ = f.SetCellValue(sheet, cellName(1, row), line.label)
+		for stuIdx, s := range summaries {
+			_ = f.SetCellValue(sheet, cellName(stuIdx+2, row), line.getValue(s))
 		}
 	}
 	return nil
 }
 
-func buildHeaders(sessions []domain.AttendanceSession) []ColumnHeader {
-	headers := []ColumnHeader{
-		{Title: "#", Width: 6},
-		{Title: "Nome", Width: 32},
-		{Title: "Matrícula", Width: 16},
-	}
-
-	for _, sess := range sessions {
-		formattedDate := formatDateHeader(sess.ClassDate)
-		headers = append(headers, ColumnHeader{Title: formattedDate, Width: 10})
-	}
-
-	headers = append(headers,
-		ColumnHeader{Title: "Presenças", Width: 12},
-		ColumnHeader{Title: "Faltas", Width: 10},
-		ColumnHeader{Title: "% Frequência", Width: 14},
-		ColumnHeader{Title: "Situação", Width: 26},
-	)
-	return headers
-}
-
-func formatDateHeader(dateStr string) string {
+func formatDateDisplay(dateStr string) string {
 	t, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
 		return dateStr
 	}
-	return t.Format("02/01")
-}
-
-func writeStudentRow(f *excelize.File, sheet string, rowNum int, summary domain.StudentSummary, sessions []domain.AttendanceSession) error {
-	col := 1
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), rowNum-1)
-	col++
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.FullName)
-	col++
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Student.RegistrationNumber)
-	col++
-
-	for _, sess := range sessions {
-		mark := getAttendanceMark(sess, summary.Student.ID)
-		_ = f.SetCellValue(sheet, cellName(col, rowNum), mark)
-		col++
-	}
-
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Presences)
-	col++
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), summary.Absences)
-	col++
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), fmt.Sprintf("%.1f%%", summary.AttendancePercent))
-	col++
-
-	situacao := "Reprovado por Falta"
-	if summary.IsApproved {
-		situacao = "Aprovado por Frequência"
-	}
-	_ = f.SetCellValue(sheet, cellName(col, rowNum), situacao)
-	return nil
+	return t.Format("02/01/2006")
 }
 
 func getAttendanceMark(sess domain.AttendanceSession, studentID string) string {
@@ -148,6 +172,6 @@ func getAttendanceMark(sess domain.AttendanceSession, studentID string) string {
 }
 
 func cellName(col, row int) string {
-	name, _ := excelize.CoordinatesToCellName(col, row)
-	return name
+	c, _ := excelize.CoordinatesToCellName(col, row)
+	return c
 }
