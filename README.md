@@ -37,18 +37,18 @@ http://localhost:8080/?roomId=!demo:matrix.dc.ufc.br&userId=@aluno:matrix.dc.ufc
 
 ### 2. Stack Completo Local via Docker Compose
 
-Inicia a aplicação Go, um servidor Matrix local (Conduit) e o cliente Element Web:
+Inicia a aplicação Go, um servidor Matrix local (Synapse) e o cliente Element Web:
 
 ```bash
 docker compose up -d
 ```
 
 - **Element Web**: `http://localhost:8081`
-- **Matrix Homeserver**: `http://localhost:6167`
+- **Matrix Homeserver (Synapse)**: `http://localhost:8008`
 - **Widget de Frequência**: `http://localhost:8080`
 
 No Element Web:
-1. Registre uma conta no homeserver `http://localhost:6167`.
+1. Conecte ao homeserver `http://localhost:8008` e crie sua conta/login.
 2. Crie uma sala.
 3. No chat da sala, digite:
    ```
