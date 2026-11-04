@@ -8,6 +8,12 @@ import (
 	"frequencia-matrix-integration/internal/matrix"
 )
 
+func (h *Handler) renderRoster(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
+	data := h.buildRosterData(ident.RoomID, token, ident.UserID, students)
+	_ = h.tmpl.ExecuteTemplate(w, "roster.html", data)
+}
+
 func (h *Handler) handleTabRoster(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
 	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
 	data := h.buildRosterData(ident.RoomID, token, ident.UserID, students)

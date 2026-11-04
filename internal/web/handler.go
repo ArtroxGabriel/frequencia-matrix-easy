@@ -47,6 +47,8 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("POST /widget/setup", h.authWrap(h.handlePostSetup))
 	h.mux.HandleFunc("GET /widget/tab/roster", h.authWrap(h.handleTabRoster))
 	h.mux.HandleFunc("POST /widget/students", h.authWrap(h.handlePostStudent))
+	h.mux.HandleFunc("POST /widget/students/import", h.authWrap(h.handleImportStudents))
+	h.mux.HandleFunc("GET /widget/students/template.csv", h.handleStudentsTemplate)
 	h.mux.HandleFunc("DELETE /widget/students/{id}", h.authWrap(h.handleDeleteStudent))
 	h.mux.HandleFunc("GET /widget/tab/attendance", h.authWrap(h.handleTabAttendance))
 	h.mux.HandleFunc("POST /widget/attendance", h.authWrap(h.handlePostAttendance))
