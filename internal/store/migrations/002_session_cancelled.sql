@@ -1,0 +1,1 @@
+ALTER TABLE attendance_sessions ADD COLUMN cancelled BOOLEAN NOT NULL DEFAULT 0;

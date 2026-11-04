@@ -217,3 +217,75 @@ func TestStoreErrorCases(t *testing.T) {
 		t.Errorf("expected ErrNotFound for non-existent session, got %v", err)
 	}
 }
+
+func newMemoryStore(t *testing.T) *store.Store {
+	t.Helper()
+	s, err := store.NewStore(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create in-memory store: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+func addStudent(t *testing.T, s *store.Store, room, id string) {
+	t.Helper()
+	stu := domain.Student{ID: id, RoomID: room, FullName: "Aluno " + id, Level: domain.LevelGraduation, Active: true}
+	if err := s.AddStudent(context.Background(), stu); err != nil {
+		t.Fatalf("failed adding student %s: %v", id, err)
+	}
+}
+
+func TestStoreCancelledSessionRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := newMemoryStore(t)
+	room := "!course:matrix.dc.ufc.br"
+	addStudent(t, s, room, "stu-1")
+
+	cancelled := domain.AttendanceSession{RoomID: room, ClassDate: "2026-03-05", Cancelled: true}
+	if err := s.RecordAttendanceSession(ctx, cancelled); err != nil {
+		t.Fatalf("expected a cancelled session without periods to be stored: %v", err)
+	}
+
+	got, err := s.GetAttendanceSession(ctx, room, "2026-03-05")
+	if err != nil || !got.Cancelled || len(got.Entries) != 0 {
+		t.Fatalf("expected a cancelled session with no entries, got %+v (err: %v)", got, err)
+	}
+
+	reopened := domain.AttendanceSession{
+		RoomID: room, ClassDate: "2026-03-05", PeriodCount: 2,
+		Entries: []domain.AttendanceEntry{{StudentID: "stu-1", IsPresent: false}},
+	}
+	if err := s.RecordAttendanceSession(ctx, reopened); err != nil {
+		t.Fatalf("failed overwriting cancelled session: %v", err)
+	}
+	all, _ := s.ListAttendanceSessions(ctx, room)
+	if len(all) != 1 || all[0].Cancelled || len(all[0].Entries) != 1 {
+		t.Errorf("expected the session to be a regular one again, got %+v", all)
+	}
+}
+
+func TestStoreDeleteAttendanceSession(t *testing.T) {
+	ctx := context.Background()
+	s := newMemoryStore(t)
+	room := "!course:matrix.dc.ufc.br"
+	addStudent(t, s, room, "stu-1")
+
+	session := domain.AttendanceSession{
+		RoomID: room, ClassDate: "2026-03-03", PeriodCount: 2,
+		Entries: []domain.AttendanceEntry{{StudentID: "stu-1", IsPresent: true}},
+	}
+	if err := s.RecordAttendanceSession(ctx, session); err != nil {
+		t.Fatalf("failed recording session: %v", err)
+	}
+
+	if err := s.DeleteAttendanceSession(ctx, room, "2026-03-03"); err != nil {
+		t.Fatalf("failed deleting session: %v", err)
+	}
+	if _, err := s.GetAttendanceSession(ctx, room, "2026-03-03"); err != store.ErrNotFound {
+		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+	if err := s.DeleteAttendanceSession(ctx, room, "2026-03-03"); err != nil {
+		t.Errorf("deleting a missing session must be a no-op, got %v", err)
+	}
+}
