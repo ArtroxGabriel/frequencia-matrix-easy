@@ -21,11 +21,18 @@ services:
       - SYNAPSE_REPORT_STATS=no
     volumes:
       - synapse_data:/data
-    command: >
-      sh -c "if [ ! -f /data/homeserver.yaml ]; then
-               python -m synapse.app.homeserver --config-path /data/homeserver.yaml --generate-config --server-name $$SYNAPSE_SERVER_NAME --report-stats $$SYNAPSE_REPORT_STATS;
-               sed -i 's/enable_registration: false/enable_registration: true/' /data/homeserver.yaml;
-             fi"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -f /data/homeserver.yaml ]; then
+          python -m synapse.app.homeserver --config-path /data/homeserver.yaml --data-directory /data --generate-config --server-name "$$SYNAPSE_SERVER_NAME" --report-stats="$$SYNAPSE_REPORT_STATS"
+          printf '\nenable_registration: true\nenable_registration_without_verification: true\n' >> /data/homeserver.yaml
+        fi
+        grep -q '^rc_login:' /data/homeserver.yaml || printf 'rc_login:\n  address: {per_second: 1000, burst_count: 1000}\n  account: {per_second: 1000, burst_count: 1000}\n  failed_attempts: {per_second: 1000, burst_count: 1000}\nrc_registration: {per_second: 1000, burst_count: 1000}\n' >> /data/homeserver.yaml
+        sed -i -e 's/^    - ::1$/    - 0.0.0.0/' -e '/^    - 127.0.0.1$/d' /data/homeserver.yaml
+        sed -i 's#filename: /homeserver.log#filename: /data/homeserver.log#' /data/localhost.log.config
+        chown -R 991:991 /data
 
   synapse:
     image: matrixdotorg/synapse:latest
