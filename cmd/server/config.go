@@ -15,6 +15,10 @@ type Config struct {
 	UserID        string
 	AccessToken   string
 	DevMode       bool
+
+	// AutoJoinServers limits which homeservers the bot accepts invites from.
+	// Empty means any server.
+	AutoJoinServers []string
 }
 
 func LoadConfig() Config {
@@ -42,7 +46,20 @@ func LoadConfig() Config {
 		UserID:        os.Getenv("MATRIX_USER_ID"),
 		AccessToken:   os.Getenv("MATRIX_ACCESS_TOKEN"),
 		DevMode:       devMode,
+
+		AutoJoinServers: parseServerList(os.Getenv("MATRIX_AUTOJOIN_SERVERS")),
 	}
+}
+
+// parseServerList splits a comma-separated list, dropping blanks.
+func parseServerList(raw string) []string {
+	var servers []string
+	for _, item := range strings.Split(raw, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			servers = append(servers, item)
+		}
+	}
+	return servers
 }
 
 func (c Config) Validate() error {

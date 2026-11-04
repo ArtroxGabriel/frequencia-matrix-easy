@@ -85,3 +85,16 @@ func TestConfigEmptyDBPath(t *testing.T) {
 		t.Errorf("expected error for empty DBPath")
 	}
 }
+
+func TestLoadConfigAutoJoinServers(t *testing.T) {
+	t.Setenv("MATRIX_AUTOJOIN_SERVERS", " ufc.br, ,alu.ufc.br ,")
+	got := LoadConfig().AutoJoinServers
+	if len(got) != 2 || got[0] != "ufc.br" || got[1] != "alu.ufc.br" {
+		t.Errorf("AutoJoinServers = %q, want [ufc.br alu.ufc.br]", got)
+	}
+
+	t.Setenv("MATRIX_AUTOJOIN_SERVERS", "")
+	if got := LoadConfig().AutoJoinServers; len(got) != 0 {
+		t.Errorf("AutoJoinServers = %q, want empty (any server)", got)
+	}
+}

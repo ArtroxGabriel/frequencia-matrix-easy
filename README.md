@@ -73,7 +73,9 @@ Adicione o widget à sala com o comando abaixo (**sem** `userId`):
 
 A identidade vem do Element, não da URL: o widget pede ao Element um token OpenID (Widget API, ação `get_openid`) e o envia no header `X-OpenID-Token`. Na primeira vez, o Element pergunta ao professor se permite que o widget verifique a identidade. O token nunca aparece em URLs. O backend valida o token no homeserver e só libera quem tem nível de poder &ge; 50 na sala, ou quem criou a sala (em salas versão 12 o criador não aparece na lista de níveis).
 
-O bot (`MATRIX_USER_ID`) precisa estar na sala para postar os avisos.
+O bot (`MATRIX_USER_ID`) precisa estar na sala: é ele que consulta os níveis de poder (a autorização do widget) e posta os avisos da chamada. Sem o bot na sala, até o professor recebe "acesso restrito". Para adicioná-lo, o professor só **convida o bot** como convidaria qualquer usuário. O app fica ouvindo o homeserver e aceita o convite sozinho, inclusive convites feitos enquanto estava desligado.
+
+Para impedir que o bot entre em salas de qualquer servidor, restrinja quem pode convidá-lo com `MATRIX_AUTOJOIN_SERVERS`. Convites de outros servidores são recusados, e o Element mostra que o bot recusou.
 
 Configure as variáveis de ambiente:
 
@@ -84,6 +86,7 @@ Configure as variáveis de ambiente:
 | `MATRIX_HOMESERVER_URL` | URL do homeserver Matrix | `https://matrix.dc.ufc.br` |
 | `MATRIX_USER_ID` | ID do bot da integração | `@frequencia-bot:matrix.dc.ufc.br` |
 | `MATRIX_ACCESS_TOKEN` | Token de acesso da conta bot | `syt_...` |
+| `MATRIX_AUTOJOIN_SERVERS` | Servidores cujos usuários podem convidar o bot, separados por vírgula. Vazio aceita qualquer servidor | `matrix.dc.ufc.br` |
 | `DEV_MODE` | `false` em produção | `false` |
 
 ---
