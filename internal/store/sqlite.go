@@ -148,13 +148,22 @@ func (s *Store) AddStudent(ctx context.Context, stu domain.Student) error {
 }
 
 func (s *Store) ListStudents(ctx context.Context, roomID string, activeOnly bool) ([]domain.Student, error) {
+	return queryStudents(ctx, s.db, roomID, activeOnly)
+}
+
+// rowQuerier is satisfied by both *sql.DB and *sql.Tx.
+type rowQuerier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func queryStudents(ctx context.Context, q rowQuerier, roomID string, activeOnly bool) ([]domain.Student, error) {
 	query := `SELECT id, room_id, full_name, registration_number, level, active, created_at FROM students WHERE room_id = ?`
 	if activeOnly {
 		query += ` AND active = 1`
 	}
 	query += ` ORDER BY full_name ASC`
 
-	rows, err := s.db.QueryContext(ctx, query, roomID)
+	rows, err := q.QueryContext(ctx, query, roomID)
 	if err != nil {
 		return nil, fmt.Errorf("failed listing students for room %s: %w", roomID, err)
 	}

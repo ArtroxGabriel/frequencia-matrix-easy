@@ -1,10 +1,8 @@
 package web
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"frequencia-matrix-integration/internal/domain"
 	"frequencia-matrix-integration/internal/matrix"
@@ -23,7 +21,7 @@ func (h *Handler) handlePostStudent(w http.ResponseWriter, r *http.Request, iden
 	}
 
 	newStu := domain.Student{
-		ID:                 fmt.Sprintf("stu_%d", time.Now().UnixNano()),
+		ID:                 domain.NewStudentID(),
 		RoomID:             ident.RoomID,
 		FullName:           strings.TrimSpace(r.FormValue("fullName")),
 		RegistrationNumber: strings.TrimSpace(r.FormValue("registrationNumber")),
