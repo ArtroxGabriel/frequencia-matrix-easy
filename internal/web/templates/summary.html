@@ -2,20 +2,19 @@
     <div class="border-b border-slate-200 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
             <h2 class="text-lg font-semibold text-slate-800">Resumo do Semestre</h2>
-            <p class="text-xs text-slate-500">Acompanhamento consolidado de faltas, presenças e aprovação por frequência.</p>
+            <p class="text-xs text-slate-500">Faltas acumuladas por aluno. A aprovação exige {{.MinAttendance}}% de presença na carga horária total.</p>
         </div>
         <div>
             <a href="/widget/export.xlsx?roomId={{.RoomID}}&openIdToken={{.Token}}"
                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium text-sm shadow transition flex items-center space-x-2">
-                <span>📊 Baixar Planilha XLSX (2 Abas)</span>
+                <span>📊 Baixar Planilha XLSX</span>
             </a>
         </div>
     </div>
 
-    <!-- Summary Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
         <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-lg">
-            <div class="text-xs text-indigo-700 uppercase font-semibold">Total de Alunos</div>
+            <div class="text-xs text-indigo-700 uppercase font-semibold">Alunos Ativos</div>
             <div class="text-2xl font-bold text-indigo-950">{{.TotalStudents}}</div>
         </div>
         <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg">
@@ -23,17 +22,20 @@
             <div class="text-2xl font-bold text-blue-950">{{.TotalSessions}}</div>
         </div>
         <div class="bg-emerald-50 border border-emerald-100 p-3 rounded-lg">
-            <div class="text-xs text-emerald-700 uppercase font-semibold">Carga Horária Planejada</div>
+            <div class="text-xs text-emerald-700 uppercase font-semibold">Carga Horária</div>
             <div class="text-2xl font-bold text-emerald-950">{{.Course.TotalPeriods}} períodos</div>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 p-3 rounded-lg">
+            <div class="text-xs text-amber-700 uppercase font-semibold">Limite de Faltas</div>
+            <div class="text-2xl font-bold text-amber-950">{{.MaxAbsences}} períodos</div>
         </div>
     </div>
 
-    <!-- Summary Tables -->
     <div class="space-y-6">
-        <!-- Graduation Table -->
+        {{range .SummaryGroups}}
         <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <div class="bg-indigo-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-indigo-950">
-                Graduação ({{len .GradSummaries}})
+            <div class="px-4 py-2 border-b border-slate-200 font-semibold text-sm {{if eq .Theme "indigo"}}bg-indigo-50 text-indigo-950{{else}}bg-purple-50 text-purple-950{{end}}">
+                {{.Title}} ({{len .Rows}})
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm divide-y divide-slate-200">
@@ -41,79 +43,44 @@
                         <tr>
                             <th class="px-4 py-2">Nome</th>
                             <th class="px-4 py-2">Matrícula</th>
-                            <th class="px-4 py-2 text-center">Presenças</th>
                             <th class="px-4 py-2 text-center">Faltas</th>
+                            <th class="px-4 py-2 text-center">Restantes</th>
+                            <th class="px-4 py-2 text-center">% Faltas</th>
                             <th class="px-4 py-2 text-center">% Frequência</th>
                             <th class="px-4 py-2 text-right">Situação</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        {{range .GradSummaries}}
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-2.5 font-medium text-slate-800">{{.Student.FullName}}</td>
+                        {{range .Rows}}
+                        <tr class="hover:bg-slate-50 {{if not .Student.Active}}text-slate-400{{end}}">
+                            <td class="px-4 py-2.5 font-medium {{if .Student.Active}}text-slate-800{{end}}">
+                                {{.Student.FullName}}
+                                {{if not .Student.Active}}<span class="ml-1 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-xs font-normal">inativo</span>{{end}}
+                            </td>
                             <td class="px-4 py-2.5 text-slate-500 font-mono text-xs">{{.Student.RegistrationNumber}}</td>
-                            <td class="px-4 py-2.5 text-center text-emerald-600 font-semibold">{{.Presences}}</td>
                             <td class="px-4 py-2.5 text-center text-red-500 font-semibold">{{.Absences}}</td>
+                            <td class="px-4 py-2.5 text-center font-semibold">{{.RemainingAbsences}}</td>
+                            <td class="px-4 py-2.5 text-center">{{printf "%.1f" .AbsencePercent}}%</td>
                             <td class="px-4 py-2.5 text-center font-bold">{{printf "%.1f" .AttendancePercent}}%</td>
                             <td class="px-4 py-2.5 text-right">
-                                {{if .IsApproved}}
-                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">Aprovado</span>
+                                {{if eq .Status "FAILED"}}
+                                <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-semibold">Reprovado por falta</span>
+                                {{else if eq .Status "WARNING"}}
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">Atenção</span>
                                 {{else}}
-                                <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-semibold">Reprovado por Falta</span>
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">Em dia</span>
                                 {{end}}
                             </td>
                         </tr>
                         {{else}}
                         <tr>
-                            <td colspan="6" class="px-4 py-6 text-center text-xs text-slate-400">Nenhum aluno de Graduação cadastrado.</td>
+                            <td colspan="7" class="px-4 py-6 text-center text-xs text-slate-400">Nenhum aluno cadastrado.</td>
                         </tr>
                         {{end}}
                     </tbody>
                 </table>
             </div>
         </div>
-
-        <!-- Pos-Graduation Table -->
-        <div class="border border-slate-200 rounded-lg overflow-hidden">
-            <div class="bg-purple-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-purple-950">
-                Pós-Graduação ({{len .PosGradSummaries}})
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm divide-y divide-slate-200">
-                    <thead class="bg-slate-50 text-xs font-semibold text-slate-600 uppercase">
-                        <tr>
-                            <th class="px-4 py-2">Nome</th>
-                            <th class="px-4 py-2">Matrícula</th>
-                            <th class="px-4 py-2 text-center">Presenças</th>
-                            <th class="px-4 py-2 text-center">Faltas</th>
-                            <th class="px-4 py-2 text-center">% Frequência</th>
-                            <th class="px-4 py-2 text-right">Situação</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {{range .PosGradSummaries}}
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-2.5 font-medium text-slate-800">{{.Student.FullName}}</td>
-                            <td class="px-4 py-2.5 text-slate-500 font-mono text-xs">{{.Student.RegistrationNumber}}</td>
-                            <td class="px-4 py-2.5 text-center text-emerald-600 font-semibold">{{.Presences}}</td>
-                            <td class="px-4 py-2.5 text-center text-red-500 font-semibold">{{.Absences}}</td>
-                            <td class="px-4 py-2.5 text-center font-bold">{{printf "%.1f" .AttendancePercent}}%</td>
-                            <td class="px-4 py-2.5 text-right">
-                                {{if .IsApproved}}
-                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">Aprovado</span>
-                                {{else}}
-                                <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded-full text-xs font-semibold">Reprovado por Falta</span>
-                                {{end}}
-                            </td>
-                        </tr>
-                        {{else}}
-                        <tr>
-                            <td colspan="6" class="px-4 py-6 text-center text-xs text-slate-400">Nenhum aluno de Pós-Graduação cadastrado.</td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        {{end}}
     </div>
 </div>
