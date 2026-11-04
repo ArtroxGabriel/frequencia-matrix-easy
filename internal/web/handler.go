@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -12,6 +13,9 @@ import (
 
 //go:embed templates/*.html
 var templateFS embed.FS
+
+//go:embed static
+var staticFS embed.FS
 
 type Handler struct {
 	store  *store.Store
@@ -42,7 +46,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("GET /healthz", h.handleHealthz)
-	h.mux.HandleFunc("GET /", h.authWrap(h.handleIndex))
+	h.mux.Handle("GET /static/", http.FileServerFS(staticFS))
+	h.mux.HandleFunc("GET /{$}", h.handleRoot)
+	h.mux.HandleFunc("GET /widget/home", h.authWrap(h.handleHome))
 	h.mux.HandleFunc("GET /widget/tab/setup", h.authWrap(h.handleTabSetup))
 	h.mux.HandleFunc("POST /widget/setup", h.authWrap(h.handlePostSetup))
 	h.mux.HandleFunc("GET /widget/tab/roster", h.authWrap(h.handleTabRoster))
@@ -62,45 +68,32 @@ func (h *Handler) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-type authHandlerFunc func(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string)
-
-func (h *Handler) authWrap(next authHandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		roomID := r.URL.Query().Get("roomId")
-		token := r.URL.Query().Get("openIdToken")
-		if token == "" {
-			token = r.URL.Query().Get("userId")
-		}
-
-		ident, err := h.matrix.VerifyUser(r.Context(), roomID, token)
-		if err != nil {
-			h.renderUnauthorized(w, roomID, token)
-			return
-		}
-
-		isTeacher, err := h.matrix.IsTeacher(r.Context(), ident.RoomID, ident.UserID)
-		if err != nil || !isTeacher {
-			h.renderUnauthorized(w, ident.RoomID, ident.UserID)
-			return
-		}
-
-		next(w, r, ident, token)
+// handleRoot serves the page. Element does not put the OpenID token in the
+// widget URL: the page asks for it through the Widget API and then loads its
+// content. So without a token in the request it serves an empty shell, which
+// holds no data and needs no authorization. With an explicit token (links used
+// for testing) the full page is rendered directly.
+func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if credentialsFrom(r).token == "" {
+		_ = h.tmpl.ExecuteTemplate(w, "layout.html", map[string]any{"Shell": true})
+		return
 	}
+	h.authWrap(h.handleIndex)(w, r)
 }
 
-func (h *Handler) renderUnauthorized(w http.ResponseWriter, roomID, userID string) {
-	w.WriteHeader(http.StatusForbidden)
-	data := map[string]string{"RoomID": roomID, "UserID": userID}
-	_ = h.tmpl.ExecuteTemplate(w, "unauthorized.html", data)
-}
-
-func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	var data map[string]any
+func (h *Handler) pageData(ctx context.Context, ident matrix.UserIdentity) map[string]any {
+	cfg, _ := h.store.GetCourseConfig(ctx, ident.RoomID)
 	if cfg.RoomID == "" {
-		data = h.buildSetupData(ident.RoomID, token, ident.UserID, cfg, "")
-	} else {
-		data = h.buildAttendanceData(r.Context(), ident.RoomID, token, ident.UserID, cfg, h.defaultClassDate(cfg))
+		return h.buildSetupData(ident.RoomID, ident.UserID, cfg, false)
 	}
-	_ = h.tmpl.ExecuteTemplate(w, "layout.html", data)
+	return h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, h.defaultClassDate(cfg))
+}
+
+func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
+	_ = h.tmpl.ExecuteTemplate(w, "layout.html", h.pageData(r.Context(), ident))
+}
+
+// handleHome renders the widget body that the shell loads once it has a token.
+func (h *Handler) handleHome(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
+	_ = h.tmpl.ExecuteTemplate(w, "app.html", h.pageData(r.Context(), ident))
 }

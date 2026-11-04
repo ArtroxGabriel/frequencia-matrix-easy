@@ -1,0 +1,42 @@
+<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+    <header class="bg-indigo-700 text-white px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+            <h1 class="text-xl font-bold tracking-tight">{{if .Course.CourseName}}{{.Course.CourseName}}{{else}}Frequência da Turma{{end}}</h1>
+            <p class="text-xs text-indigo-200">Sala: <code class="bg-indigo-800 px-1.5 py-0.5 rounded">{{.RoomID}}</code></p>
+        </div>
+        <div class="text-xs text-indigo-200">
+            Professor: <span class="font-medium text-white">{{.UserID}}</span>
+        </div>
+    </header>
+
+    <nav id="tabs" class="flex flex-wrap border-b border-slate-200 bg-slate-100 text-sm font-medium">
+        <button class="px-4 py-3 hover:text-indigo-600 focus:outline-none border-b-2 transition {{if .IsSetupTab}}border-indigo-600 text-indigo-700{{else}}border-transparent{{end}}"
+                hx-get="/widget/tab/setup?roomId={{.RoomID}}"
+                hx-target="#tab-content">
+            ⚙️ Configuração
+        </button>
+        <button class="px-4 py-3 hover:text-indigo-600 focus:outline-none border-b-2 border-transparent transition"
+                hx-get="/widget/tab/roster?roomId={{.RoomID}}"
+                hx-target="#tab-content">
+            👥 Alunos
+        </button>
+        <button class="px-4 py-3 hover:text-indigo-600 focus:outline-none border-b-2 transition {{if .IsSetupTab}}border-transparent{{else}}border-indigo-600 text-indigo-700{{end}}"
+                hx-get="/widget/tab/attendance?roomId={{.RoomID}}"
+                hx-target="#tab-content">
+            📝 Chamada Diária
+        </button>
+        <button class="px-4 py-3 hover:text-indigo-600 focus:outline-none border-b-2 border-transparent transition"
+                hx-get="/widget/tab/summary?roomId={{.RoomID}}"
+                hx-target="#tab-content">
+            📊 Resumo & Exportação
+        </button>
+    </nav>
+
+    <main id="tab-content" class="p-6">
+        {{if .IsSetupTab}}
+            {{template "setup.html" .}}
+        {{else}}
+            {{template "attendance.html" .}}
+        {{end}}
+    </main>
+</div>

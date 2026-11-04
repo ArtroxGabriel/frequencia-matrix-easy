@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -10,45 +11,71 @@ import (
 	"frequencia-matrix-integration/internal/matrix"
 )
 
-func (h *Handler) handleTabSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handleTabSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	data := h.buildSetupData(ident.RoomID, token, ident.UserID, cfg, "")
+	h.renderSetup(w, ident, cfg, false)
+}
+
+func (h *Handler) renderSetup(w http.ResponseWriter, ident matrix.UserIdentity, cfg domain.CourseConfig, saved bool) {
+	data := h.buildSetupData(ident.RoomID, ident.UserID, cfg, saved)
 	_ = h.tmpl.ExecuteTemplate(w, "setup.html", data)
 }
 
-func (h *Handler) handlePostSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// handlePostSetup saves the course. Invalid input is rejected with an empty
+// 422 so the form stays as the teacher left it, without an error message.
+func (h *Handler) handlePostSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
+	cfg, ok := parseCourseForm(r, ident.RoomID)
+	if !ok {
+		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
-
-	totalPeriods, _ := strconv.Atoi(r.FormValue("totalPeriods"))
-	startDate, _ := time.Parse("2006-01-02", r.FormValue("startDate"))
-	var weekdays []time.Weekday
-	for _, val := range r.Form["weekdays"] {
-		if day, err := strconv.Atoi(val); err == nil {
-			weekdays = append(weekdays, time.Weekday(day))
-		}
+	if err := h.store.SaveCourseConfig(r.Context(), cfg); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
+	h.renderSetup(w, ident, cfg, true)
+}
 
+func parseCourseForm(r *http.Request, roomID string) (domain.CourseConfig, bool) {
+	if err := r.ParseForm(); err != nil {
+		return domain.CourseConfig{}, false
+	}
+	totalPeriods, err := strconv.Atoi(strings.TrimSpace(r.FormValue("totalPeriods")))
+	if err != nil {
+		return domain.CourseConfig{}, false
+	}
+	startDate, err := time.Parse("2006-01-02", r.FormValue("startDate"))
+	if err != nil {
+		return domain.CourseConfig{}, false
+	}
 	cfg := domain.CourseConfig{
-		RoomID:       ident.RoomID,
+		RoomID:       roomID,
 		CourseName:   strings.TrimSpace(r.FormValue("courseName")),
-		Weekdays:     weekdays,
+		Weekdays:     parseWeekdays(r.Form["weekdays"]),
 		TotalPeriods: totalPeriods,
 		StartDate:    startDate,
 	}
-
-	if err := h.store.SaveCourseConfig(r.Context(), cfg); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	data := h.buildSetupData(ident.RoomID, token, ident.UserID, cfg, "Configurações salvas com sucesso!")
-	_ = h.tmpl.ExecuteTemplate(w, "setup.html", data)
+	return cfg, cfg.Validate() == nil
 }
 
-func (h *Handler) buildSetupData(roomID, token, userID string, cfg domain.CourseConfig, msg string) map[string]any {
+// parseWeekdays keeps the valid, distinct weekdays (0=Sunday..6=Saturday) in order.
+func parseWeekdays(values []string) []time.Weekday {
+	seen := make(map[time.Weekday]bool)
+	var days []time.Weekday
+	for _, v := range values {
+		n, err := strconv.Atoi(v)
+		day := time.Weekday(n)
+		if err != nil || n < 0 || n > 6 || seen[day] {
+			continue
+		}
+		seen[day] = true
+		days = append(days, day)
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i] < days[j] })
+	return days
+}
+
+func (h *Handler) buildSetupData(roomID, userID string, cfg domain.CourseConfig, saved bool) map[string]any {
 	weekdayChecked := make(map[int]bool)
 	for _, w := range cfg.Weekdays {
 		weekdayChecked[int(w)] = true
@@ -60,11 +87,10 @@ func (h *Handler) buildSetupData(roomID, token, userID string, cfg domain.Course
 	return map[string]any{
 		"RoomID":             roomID,
 		"UserID":             userID,
-		"Token":              token,
 		"Course":             cfg,
 		"WeekdayChecked":     weekdayChecked,
 		"StartDateFormatted": startFormatted,
-		"Message":            msg,
+		"Saved":              saved,
 		"IsSetupTab":         true,
 	}
 }

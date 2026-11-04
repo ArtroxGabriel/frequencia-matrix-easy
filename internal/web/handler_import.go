@@ -19,7 +19,7 @@ const (
 // handleImportStudents reads a [aluno, matricula] CSV into the chosen level.
 // Problems are answered with an empty status code so the roster stays on
 // screen; unusable lines are only logged.
-func (h *Handler) handleImportStudents(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handleImportStudents(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	r.Body = http.MaxBytesReader(w, r.Body, importer.MaxBytes+multipartOverhead)
 	if err := r.ParseMultipartForm(importer.MaxBytes); err != nil {
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
@@ -46,7 +46,7 @@ func (h *Handler) handleImportStudents(w http.ResponseWriter, r *http.Request, i
 	log.Printf("[INFO] roster import room=%s created=%d updated=%d skipped=%d unreadable=%d",
 		ident.RoomID, result.Created, result.Updated, result.Skipped, len(parsed.Skipped))
 
-	h.renderRoster(w, r, ident, token)
+	h.renderRoster(w, r, ident)
 }
 
 func statusForImportError(err error) int {

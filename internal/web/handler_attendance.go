@@ -40,24 +40,24 @@ func (h *Handler) defaultClassDate(cfg domain.CourseConfig) string {
 	return domain.DefaultClassDate(domain.ScheduledDates(cfg), todayISO())
 }
 
-func (h *Handler) handleTabAttendance(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handleTabAttendance(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
 	date := r.URL.Query().Get("date")
 	if !domain.IsValidDate(date) {
 		date = h.defaultClassDate(cfg)
 	}
-	h.renderAttendance(w, r.Context(), ident, token, cfg, date)
+	h.renderAttendance(w, r.Context(), ident, cfg, date)
 }
 
-func (h *Handler) renderAttendance(w http.ResponseWriter, ctx context.Context, ident matrix.UserIdentity, token string, cfg domain.CourseConfig, date string) {
-	data := h.buildAttendanceData(ctx, ident.RoomID, token, ident.UserID, cfg, date)
+func (h *Handler) renderAttendance(w http.ResponseWriter, ctx context.Context, ident matrix.UserIdentity, cfg domain.CourseConfig, date string) {
+	data := h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, date)
 	_ = h.tmpl.ExecuteTemplate(w, "attendance.html", data)
 }
 
 // handlePostAttendance saves the roll call. Everyone is present unless the
 // teacher marked an absence, so only the "absent" ids are read from the form.
 // Invalid input is rejected without a body: the widget keeps its screen.
-func (h *Handler) handlePostAttendance(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handlePostAttendance(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	classDate, ok := formClassDate(w, r)
 	if !ok {
 		return
@@ -77,12 +77,12 @@ func (h *Handler) handlePostAttendance(w http.ResponseWriter, r *http.Request, i
 		_ = h.matrix.SendNotice(r.Context(), ident.RoomID, attendanceNotice(session))
 	}
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	h.renderAttendance(w, r.Context(), ident, token, cfg, classDate)
+	h.renderAttendance(w, r.Context(), ident, cfg, classDate)
 }
 
 // handleCancelClass marks a date as "no class" (nobody gets an absence) or
 // returns it to the not-recorded state.
-func (h *Handler) handleCancelClass(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handleCancelClass(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	classDate, ok := formClassDate(w, r)
 	if !ok {
 		return
@@ -100,7 +100,7 @@ func (h *Handler) handleCancelClass(w http.ResponseWriter, r *http.Request, iden
 		return
 	}
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	h.renderAttendance(w, r.Context(), ident, token, cfg, classDate)
+	h.renderAttendance(w, r.Context(), ident, cfg, classDate)
 }
 
 // reopenClass deletes a cancelled session only; recorded roll calls are kept.
@@ -166,7 +166,7 @@ func absencesPhrase(n int) string {
 	}
 }
 
-func (h *Handler) buildAttendanceData(ctx context.Context, roomID, token, userID string, cfg domain.CourseConfig, date string) map[string]any {
+func (h *Handler) buildAttendanceData(ctx context.Context, roomID, userID string, cfg domain.CourseConfig, date string) map[string]any {
 	students, _ := h.store.ListStudents(ctx, roomID, true)
 	sessions, _ := h.store.ListAttendanceSessions(ctx, roomID)
 	current, hasCurrent, others := splitSessions(sessions, date)
@@ -181,7 +181,6 @@ func (h *Handler) buildAttendanceData(ctx context.Context, roomID, token, userID
 	return map[string]any{
 		"RoomID":        roomID,
 		"UserID":        userID,
-		"Token":         token,
 		"Course":        cfg,
 		"SelectedDate":  date,
 		"PeriodCount":   periods,

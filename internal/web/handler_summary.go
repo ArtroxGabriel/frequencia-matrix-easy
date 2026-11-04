@@ -14,7 +14,7 @@ type summaryGroup struct {
 	Rows  []domain.StudentSummary
 }
 
-func (h *Handler) handleTabSummary(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, token string) {
+func (h *Handler) handleTabSummary(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
 	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, false)
 	sessions, _ := h.store.ListAttendanceSessions(r.Context(), ident.RoomID)
@@ -23,7 +23,6 @@ func (h *Handler) handleTabSummary(w http.ResponseWriter, r *http.Request, ident
 	data := map[string]any{
 		"RoomID":        ident.RoomID,
 		"UserID":        ident.UserID,
-		"Token":         token,
 		"Course":        cfg,
 		"TotalStudents": countActive(students),
 		"TotalSessions": countHeldClasses(sessions),
@@ -65,7 +64,7 @@ func countHeldClasses(sessions []domain.AttendanceSession) int {
 	return n
 }
 
-func (h *Handler) handleExportXLSX(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity, _ string) {
+func (h *Handler) handleExportXLSX(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
 	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, false)
 	sessions, _ := h.store.ListAttendanceSessions(r.Context(), ident.RoomID)

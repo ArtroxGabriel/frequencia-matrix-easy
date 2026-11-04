@@ -6,7 +6,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 text-sm">
             <select name="date" aria-label="Data da aula"
-                    hx-get="/widget/tab/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+                    hx-get="/widget/tab/attendance?roomId={{.RoomID}}"
                     hx-trigger="change"
                     hx-target="#tab-content"
                     class="px-2.5 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -17,7 +17,7 @@
             <label class="flex items-center gap-1 text-xs text-slate-500">
                 Aula extra
                 <input type="date" name="date" aria-label="Aula extra em outra data"
-                       hx-get="/widget/tab/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+                       hx-get="/widget/tab/attendance?roomId={{.RoomID}}"
                        hx-trigger="change"
                        hx-target="#tab-content"
                        class="px-2 py-1 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -26,7 +26,7 @@
     </div>
 
     {{if .Cancelled}}
-    <form hx-post="/widget/attendance/cancel?roomId={{.RoomID}}&openIdToken={{.Token}}"
+    <form hx-post="/widget/attendance/cancel?roomId={{.RoomID}}"
           hx-target="#tab-content"
           class="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center space-y-4">
         <input type="hidden" name="classDate" value="{{.SelectedDate}}">
@@ -39,7 +39,7 @@
     </form>
     {{else}}
     <form id="attendance-form"
-          hx-post="/widget/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+          hx-post="/widget/attendance?roomId={{.RoomID}}"
           hx-target="#tab-content"
           data-limit="{{.MaxAbsences}}"
           class="space-y-4">
@@ -95,7 +95,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3">
             <button type="button"
-                    hx-post="/widget/attendance/cancel?roomId={{.RoomID}}&openIdToken={{.Token}}"
+                    hx-post="/widget/attendance/cancel?roomId={{.RoomID}}"
                     hx-vals='{"cancelled": "true"}'
                     hx-target="#tab-content"
                     {{if .SessionExists}}hx-confirm="Marcar este dia como sem aula? As faltas já registradas nele serão descartadas."{{end}}
