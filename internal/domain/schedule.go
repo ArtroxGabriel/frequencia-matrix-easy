@@ -70,35 +70,3 @@ func sortStudents(list []Student) {
 		return normI < normJ
 	})
 }
-
-func CalculateStudentSummary(student Student, sessions []AttendanceSession, totalCoursePeriods int) StudentSummary {
-	presences := 0
-	absences := 0
-
-	for _, session := range sessions {
-		for _, entry := range session.Entries {
-			if entry.StudentID != student.ID {
-				continue
-			}
-			if entry.IsPresent {
-				presences += session.PeriodCount
-			} else {
-				absences += session.PeriodCount
-			}
-			break
-		}
-	}
-
-	percent := 0.0
-	if totalCoursePeriods > 0 {
-		percent = (float64(presences) / float64(totalCoursePeriods)) * 100.0
-	}
-
-	return StudentSummary{
-		Student:           student,
-		Presences:         presences,
-		Absences:          absences,
-		AttendancePercent: percent,
-		IsApproved:        percent >= 75.0,
-	}
-}
