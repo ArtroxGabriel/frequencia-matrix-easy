@@ -21,3 +21,19 @@ tasks:
     desc: Build static binary
     cmds:
       - CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -extldflags "-static"' -o bin/server ./cmd/server
+
+  stack:
+    desc: Start Synapse, Element and the app in real mode, with a teacher, 3 students and the SD room
+    cmds:
+      - ./scripts/dev-stack.sh
+
+  stack:clean:
+    desc: Erase the local stack (accounts, rooms, data, app image) and recreate it from scratch
+    cmds:
+      - ./scripts/dev-stack.sh clean
+
+
+  stack:local:
+    desc: Same as stack, but only on localhost (no Tailscale)
+    cmds:
+      - ./scripts/dev-local.sh

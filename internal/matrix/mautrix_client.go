@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"maunium.net/go/mautrix"
@@ -13,10 +15,14 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+// teacherPowerLevel is the room power level (moderator) that grants teacher access.
+const teacherPowerLevel = 50
+
 type MautrixGateway struct {
 	client        *mautrix.Client
 	homeserverURL string
 	httpClient    *http.Client
+	createEvents  sync.Map // id.RoomID -> *event.Event
 }
 
 func NewMautrixGateway(homeserverURL, userID, accessToken string) (*MautrixGateway, error) {
@@ -77,8 +83,26 @@ func (m *MautrixGateway) IsTeacher(ctx context.Context, roomID string, userID st
 		return false, fmt.Errorf("failed fetching room %s power levels: %w", roomID, err)
 	}
 
-	level := powerLevels.GetUserLevel(id.UserID(userID))
-	return level >= 50, nil
+	powerLevels.CreateEvent = m.createEvent(ctx, id.RoomID(roomID))
+	return powerLevels.GetUserLevel(id.UserID(userID)) >= teacherPowerLevel, nil
+}
+
+// createEvent returns the room's m.room.create event. Rooms of version 12 and
+// later do not list their creators in m.room.power_levels because creators have
+// infinite power, so the create event is needed to recognise them. It never
+// changes, so it is cached. If it cannot be fetched, only creator detection is
+// lost: the power levels still decide.
+func (m *MautrixGateway) createEvent(ctx context.Context, roomID id.RoomID) *event.Event {
+	if cached, ok := m.createEvents.Load(roomID); ok {
+		return cached.(*event.Event)
+	}
+	evt, err := m.client.FullStateEvent(ctx, roomID, event.StateCreate, "")
+	if err != nil || evt == nil {
+		log.Printf("[WARN] could not fetch m.room.create for room %s, room creators will not be recognised: %v", roomID, err)
+		return nil
+	}
+	m.createEvents.Store(roomID, evt)
+	return evt
 }
 
 func (m *MautrixGateway) SendNotice(ctx context.Context, roomID string, message string) error {

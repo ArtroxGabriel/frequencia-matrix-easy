@@ -4,13 +4,7 @@
         <p class="text-xs text-slate-500">Defina o nome, os dias de aula na semana e a carga horária total do semestre.</p>
     </div>
 
-    {{if .Message}}
-    <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-sm">
-        {{.Message}}
-    </div>
-    {{end}}
-
-    <form hx-post="/widget/setup?roomId={{.RoomID}}&openIdToken={{.Token}}"
+    <form id="setup-form" hx-post="/widget/setup?roomId={{.RoomID}}"
           hx-target="#tab-content"
           class="space-y-4 max-w-lg">
         <div>
@@ -63,9 +57,27 @@
             </div>
         </div>
 
-        <button type="submit"
-                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition">
-            💾 Salvar Configurações
+        <button id="save-setup" type="submit"
+                class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded font-medium text-sm transition">
+            {{if .Saved}}✓ Configurações salvas{{else}}💾 Salvar Configurações{{end}}
         </button>
     </form>
+
+    <script>
+    (function () {
+        var form = document.getElementById('setup-form');
+        if (!form) { return; }
+        var save = document.getElementById('save-setup');
+        function sync() {
+            save.disabled = !form.querySelector('input[name=weekdays]:checked');
+        }
+        form.addEventListener('change', function () {
+            sync();
+            save.textContent = '💾 Salvar Configurações';
+        });
+        sync();
+    })();
+    </script>
+
+    {{if .CanManagePIN}}{{template "pin_manage" .}}{{end}}
 </div>

@@ -10,7 +10,7 @@
     </div>
 
     <!-- Quick Add Student Form -->
-    <form hx-post="/widget/students?roomId={{.RoomID}}&openIdToken={{.Token}}"
+    <form hx-post="/widget/students?roomId={{.RoomID}}"
           hx-target="#tab-content"
           class="bg-slate-50 p-4 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
         <div class="sm:col-span-2">
@@ -39,6 +39,31 @@
         </div>
     </form>
 
+    <!-- CSV Import -->
+    <form hx-post="/widget/students/import?roomId={{.RoomID}}"
+          hx-encoding="multipart/form-data"
+          hx-target="#tab-content"
+          class="bg-slate-50 p-4 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+        <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Importar lista (CSV: aluno, matrícula)</label>
+            <input type="file" name="file" accept=".csv,text/csv,text/plain" required
+                   class="w-full text-sm text-slate-600 file:mr-3 file:px-3 file:py-1.5 file:border-0 file:rounded file:bg-slate-200 file:text-slate-700 file:text-sm hover:file:bg-slate-300">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nível dos alunos</label>
+            <select name="level" class="w-full px-3 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="GRADUATION">Graduação</option>
+                <option value="POS_GRADUATION">Pós-Graduação</option>
+            </select>
+        </div>
+        <div class="flex items-center justify-between sm:justify-end gap-3">
+            <a href="/widget/students/template.csv" download class="text-xs text-indigo-600 hover:underline">Baixar modelo</a>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium transition">
+                📥 Importar
+            </button>
+        </div>
+    </form>
+
     <!-- Students Lists -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Graduation -->
@@ -54,9 +79,9 @@
                         <div class="font-medium text-slate-800">{{.FullName}}</div>
                         {{if .RegistrationNumber}}<div class="text-xs text-slate-400">Matrícula: {{.RegistrationNumber}}</div>{{end}}
                     </div>
-                    <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}&openIdToken={{$.Token}}"
+                    <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}"
                             hx-target="#tab-content"
-                            hx-confirm="Deseja remover este aluno?"
+                            data-confirm-label="Confirmar remoção"
                             class="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded transition">
                         Remover
                     </button>
@@ -80,9 +105,9 @@
                         <div class="font-medium text-slate-800">{{.FullName}}</div>
                         {{if .RegistrationNumber}}<div class="text-xs text-slate-400">Matrícula: {{.RegistrationNumber}}</div>{{end}}
                     </div>
-                    <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}&openIdToken={{$.Token}}"
+                    <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}"
                             hx-target="#tab-content"
-                            hx-confirm="Deseja remover este aluno?"
+                            data-confirm-label="Confirmar remoção"
                             class="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded transition">
                         Remover
                     </button>

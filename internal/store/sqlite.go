@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"frequencia-matrix-integration/internal/domain"
@@ -18,6 +19,10 @@ var ErrNotFound = errors.New("record not found")
 
 type Store struct {
 	db *sql.DB
+
+	// pinMu serialises PIN logins so that concurrent wrong guesses cannot
+	// slip past the attempt counter.
+	pinMu sync.Mutex
 }
 
 func NewStore(dbPath string) (*Store, error) {
@@ -148,13 +153,22 @@ func (s *Store) AddStudent(ctx context.Context, stu domain.Student) error {
 }
 
 func (s *Store) ListStudents(ctx context.Context, roomID string, activeOnly bool) ([]domain.Student, error) {
+	return queryStudents(ctx, s.db, roomID, activeOnly)
+}
+
+// rowQuerier is satisfied by both *sql.DB and *sql.Tx.
+type rowQuerier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func queryStudents(ctx context.Context, q rowQuerier, roomID string, activeOnly bool) ([]domain.Student, error) {
 	query := `SELECT id, room_id, full_name, registration_number, level, active, created_at FROM students WHERE room_id = ?`
 	if activeOnly {
 		query += ` AND active = 1`
 	}
 	query += ` ORDER BY full_name ASC`
 
-	rows, err := s.db.QueryContext(ctx, query, roomID)
+	rows, err := q.QueryContext(ctx, query, roomID)
 	if err != nil {
 		return nil, fmt.Errorf("failed listing students for room %s: %w", roomID, err)
 	}
@@ -221,8 +235,8 @@ func upsertSessionHeader(ctx context.Context, tx *sql.Tx, session domain.Attenda
 		if createdAt.IsZero() {
 			createdAt = time.Now().UTC()
 		}
-		query := `INSERT INTO attendance_sessions (id, room_id, class_date, period_count, created_at) VALUES (?, ?, ?, ?, ?)`
-		if _, err := tx.ExecContext(ctx, query, sessionID, session.RoomID, session.ClassDate, session.PeriodCount, createdAt); err != nil {
+		query := `INSERT INTO attendance_sessions (id, room_id, class_date, period_count, cancelled, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+		if _, err := tx.ExecContext(ctx, query, sessionID, session.RoomID, session.ClassDate, session.PeriodCount, session.Cancelled, createdAt); err != nil {
 			return "", fmt.Errorf("failed inserting attendance session header: %w", err)
 		}
 		return sessionID, nil
@@ -230,8 +244,8 @@ func upsertSessionHeader(ctx context.Context, tx *sql.Tx, session domain.Attenda
 		return "", fmt.Errorf("failed checking existing session: %w", err)
 	}
 
-	updateQuery := `UPDATE attendance_sessions SET period_count = ? WHERE id = ?`
-	if _, err := tx.ExecContext(ctx, updateQuery, session.PeriodCount, existingID); err != nil {
+	updateQuery := `UPDATE attendance_sessions SET period_count = ?, cancelled = ? WHERE id = ?`
+	if _, err := tx.ExecContext(ctx, updateQuery, session.PeriodCount, session.Cancelled, existingID); err != nil {
 		return "", fmt.Errorf("failed updating session period_count: %w", err)
 	}
 	return existingID, nil
@@ -257,7 +271,7 @@ func replaceSessionEntries(ctx context.Context, tx *sql.Tx, sessionID string, en
 }
 
 func (s *Store) ListAttendanceSessions(ctx context.Context, roomID string) ([]domain.AttendanceSession, error) {
-	headerQuery := `SELECT id, room_id, class_date, period_count, created_at FROM attendance_sessions WHERE room_id = ? ORDER BY class_date ASC`
+	headerQuery := `SELECT id, room_id, class_date, period_count, cancelled, created_at FROM attendance_sessions WHERE room_id = ? ORDER BY class_date ASC`
 	rows, err := s.db.QueryContext(ctx, headerQuery, roomID)
 	if err != nil {
 		return nil, fmt.Errorf("failed querying sessions for room %s: %w", roomID, err)
@@ -266,7 +280,7 @@ func (s *Store) ListAttendanceSessions(ctx context.Context, roomID string) ([]do
 	var sessions []domain.AttendanceSession
 	for rows.Next() {
 		var sess domain.AttendanceSession
-		if err := rows.Scan(&sess.ID, &sess.RoomID, &sess.ClassDate, &sess.PeriodCount, &sess.CreatedAt); err != nil {
+		if err := rows.Scan(&sess.ID, &sess.RoomID, &sess.ClassDate, &sess.PeriodCount, &sess.Cancelled, &sess.CreatedAt); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("failed scanning session row: %w", err)
 		}
@@ -290,10 +304,10 @@ func (s *Store) ListAttendanceSessions(ctx context.Context, roomID string) ([]do
 }
 
 func (s *Store) GetAttendanceSession(ctx context.Context, roomID string, classDate string) (domain.AttendanceSession, error) {
-	query := `SELECT id, room_id, class_date, period_count, created_at FROM attendance_sessions WHERE room_id = ? AND class_date = ?`
+	query := `SELECT id, room_id, class_date, period_count, cancelled, created_at FROM attendance_sessions WHERE room_id = ? AND class_date = ?`
 	var sess domain.AttendanceSession
 	row := s.db.QueryRowContext(ctx, query, roomID, classDate)
-	err := row.Scan(&sess.ID, &sess.RoomID, &sess.ClassDate, &sess.PeriodCount, &sess.CreatedAt)
+	err := row.Scan(&sess.ID, &sess.RoomID, &sess.ClassDate, &sess.PeriodCount, &sess.Cancelled, &sess.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.AttendanceSession{}, ErrNotFound
 	}
@@ -326,4 +340,23 @@ func (s *Store) getSessionEntries(ctx context.Context, sessionID string) ([]doma
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
+}
+
+// DeleteAttendanceSession removes the recorded session of a date, returning
+// the day to its "not recorded yet" state.
+func (s *Store) DeleteAttendanceSession(ctx context.Context, roomID string, classDate string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed starting tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	entries := `DELETE FROM attendance_entries WHERE session_id IN (SELECT id FROM attendance_sessions WHERE room_id = ? AND class_date = ?)`
+	if _, err := tx.ExecContext(ctx, entries, roomID, classDate); err != nil {
+		return fmt.Errorf("failed deleting entries for room %s date %s: %w", roomID, classDate, err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM attendance_sessions WHERE room_id = ? AND class_date = ?`, roomID, classDate); err != nil {
+		return fmt.Errorf("failed deleting session for room %s date %s: %w", roomID, classDate, err)
+	}
+	return tx.Commit()
 }

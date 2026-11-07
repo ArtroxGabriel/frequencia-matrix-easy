@@ -95,4 +95,10 @@ func TestAttendanceSessionValidate(t *testing.T) {
 	if err := invalidPeriods.Validate(); err == nil {
 		t.Errorf("expected error for non-positive PeriodCount")
 	}
+
+	cancelled := invalidPeriods
+	cancelled.Cancelled = true
+	if err := cancelled.Validate(); err != nil {
+		t.Errorf("a cancelled session needs no period count, got: %v", err)
+	}
 }

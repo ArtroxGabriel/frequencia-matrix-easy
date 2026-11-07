@@ -1,0 +1,16 @@
+# Runs the app against the real Synapse of this stack instead of DEV_MODE.
+# It is meant to be layered on docker-compose.yml by scripts/dev-stack.sh:
+#
+#   BOT_USER_ID=... BOT_ACCESS_TOKEN=... \
+#     docker compose -f docker-compose.yml -f docker-compose.real.yml up -d --build frequencia
+services:
+  frequencia:
+    environment:
+      - DEV_MODE=false
+      - MATRIX_HOMESERVER_URL=http://synapse:8008
+      - MATRIX_USER_ID=${BOT_USER_ID:-}
+      - MATRIX_ACCESS_TOKEN=${BOT_ACCESS_TOKEN:-}
+      - MATRIX_AUTOJOIN_SERVERS=localhost
+      - PIN_SESSION_TTL=${PIN_SESSION_TTL:-24h}
+    depends_on:
+      - synapse

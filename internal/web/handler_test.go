@@ -143,7 +143,6 @@ func TestHandlerStudentAndAttendanceWorkflow(t *testing.T) {
 	attForm := url.Values{
 		"classDate":   {"2026-03-03"},
 		"periodCount": {"2"},
-		"present":     {stuID},
 	}
 	reqAtt := httptest.NewRequest(http.MethodPost, "/widget/attendance"+authQuery, strings.NewReader(attForm.Encode()))
 	reqAtt.Header.Set("Content-Type", "application/x-www-form-urlencoded")

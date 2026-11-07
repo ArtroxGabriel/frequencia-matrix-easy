@@ -1,94 +1,154 @@
-<div class="space-y-6">
-    <div class="border-b border-slate-200 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+<div class="space-y-5">
+    <div class="border-b border-slate-200 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
             <h2 class="text-lg font-semibold text-slate-800">Chamada Diária</h2>
-            <p class="text-xs text-slate-500">Faça a chamada dos alunos presentes na aula de hoje ou na data selecionada.</p>
+            <p class="text-xs text-slate-500">Todos começam presentes. Toque apenas em quem faltou.</p>
         </div>
-        <div>
-            <input type="date" value="{{.SelectedDate}}"
-                   hx-get="/widget/tab/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
-                   hx-target="#tab-content"
-                   name="date"
-                   class="px-2.5 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+            <select name="date" aria-label="Data da aula"
+                    hx-get="/widget/tab/attendance?roomId={{.RoomID}}"
+                    hx-trigger="change"
+                    hx-target="#tab-content"
+                    class="px-2.5 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                {{range .DateOptions}}
+                <option value="{{.Value}}" {{if eq .Value $.SelectedDate}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+            </select>
+            <label class="flex items-center gap-1 text-xs text-slate-500">
+                Aula extra
+                <input type="date" name="date" aria-label="Aula extra em outra data"
+                       hx-get="/widget/tab/attendance?roomId={{.RoomID}}"
+                       hx-trigger="change"
+                       hx-target="#tab-content"
+                       class="px-2 py-1 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </label>
         </div>
     </div>
 
-    {{if .Message}}
-    <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-sm flex items-center justify-between">
-        <span>{{.Message}}</span>
-        <span class="text-xs text-emerald-600">Mensagem postada na sala Matrix!</span>
-    </div>
-    {{end}}
-
-    <form hx-post="/widget/attendance?roomId={{.RoomID}}&openIdToken={{.Token}}"
+    {{if .Cancelled}}
+    <form hx-post="/widget/attendance/cancel?roomId={{.RoomID}}"
           hx-target="#tab-content"
-          class="space-y-6">
+          class="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center space-y-4">
         <input type="hidden" name="classDate" value="{{.SelectedDate}}">
-        
-        <div class="flex items-center space-x-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-            <span class="text-xs font-semibold text-slate-700 uppercase">Períodos desta aula:</span>
-            <label class="flex items-center space-x-1 text-sm">
-                <input type="radio" name="periodCount" value="1" {{if eq .PeriodCount 1}}checked{{end}} class="text-indigo-600">
-                <span>1 período (50 min)</span>
-            </label>
-            <label class="flex items-center space-x-1 text-sm">
-                <input type="radio" name="periodCount" value="2" {{if ne .PeriodCount 1}}checked{{end}} class="text-indigo-600">
-                <span>2 períodos (100 min)</span>
-            </label>
+        <input type="hidden" name="cancelled" value="false">
+        <div class="text-sm font-semibold text-slate-700">Sem aula neste dia. Ninguém recebe falta.</div>
+        <button type="submit"
+                class="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 rounded text-sm font-medium text-slate-700 transition">
+            Desfazer e fazer a chamada
+        </button>
+    </form>
+    {{else}}
+    <form id="attendance-form"
+          hx-post="/widget/attendance?roomId={{.RoomID}}"
+          hx-target="#tab-content"
+          data-limit="{{.MaxAbsences}}"
+          class="space-y-4">
+        <input type="hidden" name="classDate" value="{{.SelectedDate}}">
+
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div class="flex items-center gap-4 text-sm">
+                <span class="text-xs font-semibold text-slate-700 uppercase">Períodos</span>
+                <label class="flex items-center gap-1">
+                    <input type="radio" name="periodCount" value="1" {{if eq .PeriodCount 1}}checked{{end}} class="text-indigo-600">
+                    <span>1</span>
+                </label>
+                <label class="flex items-center gap-1">
+                    <input type="radio" name="periodCount" value="2" {{if ne .PeriodCount 1}}checked{{end}} class="text-indigo-600">
+                    <span>2</span>
+                </label>
+            </div>
+            <div class="text-sm text-slate-600">
+                Faltas hoje:
+                <span id="absent-count" class="font-bold text-red-600">{{.AbsentCount}}</span>
+                de {{.TotalStudents}}
+            </div>
         </div>
 
-        <!-- Student Attendance Checklists -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Graduation -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {{range .Groups}}
             <div class="border border-slate-200 rounded-lg overflow-hidden">
-                <div class="bg-indigo-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-indigo-950">
-                    Graduação ({{len .GradStudents}})
+                <div class="px-4 py-2 border-b border-slate-200 font-semibold text-sm {{if eq .Theme "indigo"}}bg-indigo-50 text-indigo-950{{else}}bg-purple-50 text-purple-950{{end}}">
+                    {{.Title}} ({{len .Rows}})
                 </div>
                 <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                    {{range .GradStudents}}
-                    <label class="px-4 py-3 flex items-center justify-between hover:bg-indigo-50/50 cursor-pointer transition select-none">
-                        <div>
-                            <span class="font-medium text-sm text-slate-800">{{.FullName}}</span>
-                            {{if .RegistrationNumber}}<span class="text-xs text-slate-400 ml-2">({{.RegistrationNumber}})</span>{{end}}
+                    {{range .Rows}}
+                    <label class="block cursor-pointer select-none">
+                        <input type="checkbox" name="absent" value="{{.ID}}" data-base="{{.Base}}" {{if .Absent}}checked{{end}} class="peer sr-only">
+                        <div class="px-4 py-3 flex items-center justify-between gap-3 border-l-4 border-transparent hover:bg-slate-50 transition peer-checked:bg-red-50 peer-checked:border-red-500 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500">
+                            <div class="min-w-0">
+                                <span class="font-medium text-sm text-slate-800">{{.Name}}</span>
+                                {{if .Registration}}<span class="text-xs text-slate-400 ml-2">({{.Registration}})</span>{{end}}
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span data-flag class="{{if not .Absent}}hidden {{end}}text-xs font-bold text-red-600">FALTA</span>
+                                <span data-badge class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{.Total}}/{{$.MaxAbsences}}</span>
+                            </div>
                         </div>
-                        <input type="checkbox" name="present" value="{{.ID}}"
-                               {{if index $.PresentMap .ID}}checked{{end}}
-                               class="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
                     </label>
                     {{else}}
                     <div class="p-4 text-center text-xs text-slate-400">Nenhum aluno cadastrado.</div>
                     {{end}}
                 </div>
             </div>
-
-            <!-- Pos-Graduation -->
-            <div class="border border-slate-200 rounded-lg overflow-hidden">
-                <div class="bg-purple-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-purple-950">
-                    Pós-Graduação ({{len .PosGradStudents}})
-                </div>
-                <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                    {{range .PosGradStudents}}
-                    <label class="px-4 py-3 flex items-center justify-between hover:bg-purple-50/50 cursor-pointer transition select-none">
-                        <div>
-                            <span class="font-medium text-sm text-slate-800">{{.FullName}}</span>
-                            {{if .RegistrationNumber}}<span class="text-xs text-slate-400 ml-2">({{.RegistrationNumber}})</span>{{end}}
-                        </div>
-                        <input type="checkbox" name="present" value="{{.ID}}"
-                               {{if index $.PresentMap .ID}}checked{{end}}
-                               class="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer">
-                    </label>
-                    {{else}}
-                    <div class="p-4 text-center text-xs text-slate-400">Nenhum aluno cadastrado.</div>
-                    {{end}}
-                </div>
-            </div>
+            {{end}}
         </div>
 
-        <div class="flex justify-end">
-            <button type="submit"
-                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium text-sm shadow transition flex items-center space-x-2">
-                <span>💾 Salvar Chamada do Dia</span>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <button type="button"
+                    hx-post="/widget/attendance/cancel?roomId={{.RoomID}}"
+                    hx-vals='{"cancelled": "true"}'
+                    hx-target="#tab-content"
+                    {{if .SessionExists}}data-confirm-label="Descartar as faltas deste dia?"{{end}}
+                    class="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 rounded text-sm text-slate-600 transition">
+                Sem aula neste dia
+            </button>
+            <button id="save-attendance" type="submit"
+                    class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium text-sm shadow transition">
+                {{if .SessionExists}}✓ Chamada salva{{else}}💾 Salvar chamada{{end}}
             </button>
         </div>
     </form>
+
+    <script>
+    (function () {
+        var form = document.getElementById('attendance-form');
+        if (!form) { return; }
+        var limit = parseInt(form.dataset.limit, 10) || 0;
+        var counter = document.getElementById('absent-count');
+        var save = document.getElementById('save-attendance');
+
+        function periods() {
+            var checked = form.querySelector('input[name=periodCount]:checked');
+            return checked ? parseInt(checked.value, 10) : 2;
+        }
+
+        function badgeClass(total) {
+            var base = 'text-xs px-2 py-0.5 rounded-full ';
+            if (total > limit) { return base + 'bg-red-100 text-red-700 font-semibold'; }
+            if (total > 0 && total * 4 >= limit * 3) { return base + 'bg-amber-100 text-amber-800 font-semibold'; }
+            return base + 'bg-slate-100 text-slate-600';
+        }
+
+        function refresh() {
+            var p = periods(), count = 0;
+            form.querySelectorAll('input[name=absent]').forEach(function (box) {
+                var total = parseInt(box.dataset.base, 10) + (box.checked ? p : 0);
+                var row = box.nextElementSibling;
+                var badge = row.querySelector('[data-badge]');
+                badge.textContent = total + '/' + limit;
+                badge.className = badgeClass(total);
+                row.querySelector('[data-flag]').classList.toggle('hidden', !box.checked);
+                if (box.checked) { count++; }
+            });
+            counter.textContent = count;
+        }
+
+        form.addEventListener('change', function () {
+            refresh();
+            save.textContent = '💾 Salvar chamada';
+        });
+        refresh();
+    })();
+    </script>
+    {{end}}
 </div>

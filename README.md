@@ -6,16 +6,21 @@ Integração de chamada e controle de frequência para salas Matrix e Element We
 
 - **Controle de Acesso por Papel na Sala (Teacher-Only)**: Inspeciona o estado da sala Matrix (`m.room.power_levels`). Usuários com nível de poder &ge; 50 (Moderadores / Professores) têm acesso total. Alunos (nível 0) recebem tela explicativa de acesso restrito.
 - **Configuração da Disciplina**: Definição de dias da semana (ex: Terça/Quinta), data de início e total de períodos letivos planejados no semestre.
-- **Quadro de Alunos**: Cadastro e remoção de alunos em duas categorias independentes: **Graduação** e **Pós-Graduação**. Ordenação alfabética insensível a acentos (ex: *Érika* tratada como *Erika*).
-- **Chamada Diária Interativa**: Widget visual embutido via HTMX/Tailwind no Element para realização da chamada em tempo real durante a aula.
-- **Notificação na Sala**: Ao salvar a chamada, um aviso (`m.notice`) é postado na sala Matrix com o resumo de presenças da data.
-- **Exportação XLSX de Fim de Semestre**: Gera planilha Excel `.xlsx` com duas abas (`Graduacao` e `Pos-Graduacao`), alunos em ordem alfabética A-Z, colunas dinâmicas por dia de aula (`P`/`F`), totais e cálculo de aprovação por frequência (&ge; 75%).
+- **Quadro de Alunos**: Cadastro e remoção de alunos em duas categorias independentes: **Graduação** e **Pós-Graduação**. Ordenação alfabética insensível a acentos (ex: *Érika* tratada como *Erika*). Alunos removidos ficam marcados como *inativos* no resumo e na planilha, preservando o histórico.
+- **Importação por CSV**: Importa a turma de um arquivo `aluno,matricula` (separador `,`, `;` ou tab; com ou sem cabeçalho; UTF-8, Windows-1252 ou UTF-16 do Excel). Reimportar o mesmo arquivo atualiza os alunos em vez de duplicá-los. Há um modelo para download na própria aba.
+- **Chamada por faltas**: Todos os alunos começam presentes e o professor toca **apenas em quem faltou**. O widget mostra o contador de faltas do dia e as faltas acumuladas de cada aluno contra o limite. O salvamento é explícito (botão "Salvar chamada").
+- **Calendário de aulas**: A data é escolhida entre as aulas previstas (dias da semana configurados), com opção de aula extra. Um dia pode ser marcado como **"sem aula"**: ninguém recebe falta.
+- **Notificação na Sala**: Na primeira gravação de uma data, um aviso (`m.notice`) é postado na sala Matrix com o número de faltas. Editar a chamada depois não repete o aviso.
+- **Regra de aprovação**: São exigidos **75% de presença** sobre a carga horária total. Com 32 períodos o limite é 8 faltas. O status é *Em dia*, *Atenção* (a partir de 75% do limite) ou *Reprovado por falta*.
+- **Exportação XLSX de Fim de Semestre**: Gera planilha Excel `.xlsx` com duas abas (`Graduacao` e `Pos-Graduacao`), datas das aulas por aluno (`P`/`F`, `S/A` para dia sem aula), faltas, % de faltas, faltas restantes, % de frequência e situação.
 - **Persistência Confiável e Leve**: SQLite puro Go (`modernc.org/sqlite`, sem dependência de CGO) com modo WAL (`Write-Ahead Logging`) e migrações SQL embutidas no binário.
 - **Container Estático Ultraleve**: Imagem Docker multi-stage construída sobre `FROM scratch` executando com usuário não-privilegiado `10001:10001`.
 
 ---
 
 ## Como Executar Localmente
+
+> Guia completo, com os scripts de stack local e de Tailscale: [docs/COMO-RODAR.md](docs/COMO-RODAR.md).
 
 ### 1. Modo de Desenvolvimento Rápido (Dev Mode)
 
@@ -47,17 +52,42 @@ docker compose up -d
 - **Matrix Homeserver (Synapse)**: `http://localhost:8008`
 - **Widget de Frequência**: `http://localhost:8080`
 
+> O serviço do app no `docker-compose.yml` usa `DEV_MODE=true`. Depois de alterar o código, reconstrua a imagem com `docker compose up -d --build frequencia`.
+
 No Element Web:
 1. Conecte ao homeserver `http://localhost:8008` e crie sua conta/login.
 2. Crie uma sala.
 3. No chat da sala, digite:
    ```
-   /addwidget http://localhost:8080/?roomId=$matrix_room_id&userId=$matrix_user_id
+   /addwidget http://localhost:8080/?roomId=$matrix_room_id&widgetId=$matrix_widget_id&userId=$matrix_user_id
    ```
+   No modo dev, o `userId` identifica o professor (um usuário cujo nome contém `prof` ou `teacher`). O widget está no painel da sala, em *Informações da sala → Extensões*.
 
 ---
 
 ## Implantação em Produção (`matrix.dc.ufc.br`)
+
+Adicione o widget à sala com o comando abaixo (**sem** `userId`):
+
+```
+/addwidget https://frequencia.exemplo.ufc.br/?roomId=$matrix_room_id&widgetId=$matrix_widget_id
+```
+
+A identidade vem do Element, não da URL: o widget pede ao Element um token OpenID (Widget API, ação `get_openid`) e o envia no header `X-OpenID-Token`. Na primeira vez, o Element pergunta ao professor se permite que o widget verifique a identidade. O token nunca aparece em URLs. O backend valida o token no homeserver e só libera quem tem nível de poder &ge; 50 na sala, ou quem criou a sala (em salas versão 12 o criador não aparece na lista de níveis).
+
+O bot (`MATRIX_USER_ID`) precisa estar na sala: é ele que consulta os níveis de poder (a autorização do widget) e posta os avisos da chamada. Sem o bot na sala, até o professor recebe "acesso restrito". Para adicioná-lo, o professor só **convida o bot** como convidaria qualquer usuário. O app fica ouvindo o homeserver e aceita o convite sozinho, inclusive convites feitos enquanto estava desligado.
+
+Para impedir que o bot entre em salas de qualquer servidor, restrinja quem pode convidá-lo com `MATRIX_AUTOJOIN_SERVERS`. Convites de outros servidores são recusados, e o Element mostra que o bot recusou.
+
+### Acesso por PIN (clientes sem OpenID)
+
+O app **Element para Android** não implementa a ação `get_openid` da Widget API, então o widget nunca recebe o token de identidade ali. Para esses clientes, cada sala pode ter um **PIN de 6 dígitos**:
+
+1. O professor abre o widget no **Element Web** (onde a identidade é confirmada), vai em **Configuração > Acesso pelo celular (PIN)** e clica em **Gerar PIN**. O PIN aparece **uma única vez**: anote-o.
+2. No app do celular, o widget mostra um campo de PIN. Com o PIN correto, o acesso dura 24 horas (ajustável com `PIN_SESSION_TTL`) e fica guardado no aparelho.
+3. **Gerar novo PIN** desativa o anterior e encerra todos os acessos abertos com ele.
+
+Regras de segurança: só o professor identificado por OpenID cria ou troca o PIN (uma sessão aberta por PIN não pode); o servidor guarda apenas o hash; 5 erros seguidos bloqueiam a sala por 15 minutos, dobrando a cada nova rodada, até 24 horas; o token de sessão trafega só em header, nunca na URL. Quem tem o PIN acessa como professor da sala e não há registro de quem fez cada chamada. Use sempre HTTPS, senão o PIN trafega em texto aberto. O acesso por OpenID continua igual e não pede PIN.
 
 Configure as variáveis de ambiente:
 
@@ -68,6 +98,8 @@ Configure as variáveis de ambiente:
 | `MATRIX_HOMESERVER_URL` | URL do homeserver Matrix | `https://matrix.dc.ufc.br` |
 | `MATRIX_USER_ID` | ID do bot da integração | `@frequencia-bot:matrix.dc.ufc.br` |
 | `MATRIX_ACCESS_TOKEN` | Token de acesso da conta bot | `syt_...` |
+| `MATRIX_AUTOJOIN_SERVERS` | Servidores cujos usuários podem convidar o bot, separados por vírgula. Vazio aceita qualquer servidor | `matrix.dc.ufc.br` |
+| `PIN_SESSION_TTL` | Duração do acesso aberto com o PIN (`24h` por padrão) | `12h` |
 | `DEV_MODE` | `false` em produção | `false` |
 
 ---
@@ -99,12 +131,17 @@ frequencia-matrix-integration/
 ├── internal/
 │   ├── domain/
 │   │   ├── models.go           # Modelos de domínio imutáveis e validação
-│   │   ├── schedule.go         # Algoritmos de agendamento, ordenação com folding e cálculos de presença
-│   │   └── schedule_test.go    # Testes unitários do domínio
+│   │   ├── schedule.go         # Datas das aulas e ordenação com remoção de acentos
+│   │   ├── calendar.go         # Janela de datas da chamada, data padrão e rótulos
+│   │   ├── summary.go          # Faltas, limite de 75% de presença e status do aluno
+│   │   └── *_test.go           # Testes unitários do domínio
+│   ├── importer/
+│   │   └── students_csv.go     # Leitura do CSV [aluno, matrícula] (BOM, separadores, codificações)
 │   ├── store/
 │   │   ├── sqlite.go           # Repositório SQLite puro Go (WAL mode)
+│   │   ├── import.go           # Importação idempotente da turma (upsert por matrícula/nome)
 │   │   ├── migrations.go       # Executor de migrações embutidas (//go:embed)
-│   │   ├── migrations/         # Arquivos SQL versionados (001_initial.sql)
+│   │   ├── migrations/         # Arquivos SQL versionados (001_initial.sql, 002_session_cancelled.sql)
 │   │   └── sqlite_test.go      # Testes de integração com SQLite in-memory
 │   ├── matrix/
 │   │   ├── gateway.go          # Interface abstrata do gateway Matrix
@@ -115,10 +152,14 @@ frequencia-matrix-integration/
 │   │   ├── xlsx.go             # Gerador de planilha com 2 abas (Graduação e Pós-Graduação)
 │   │   └── xlsx_test.go        # Testes de formatação e ordenação A-Z no XLSX
 │   └── web/
-│       ├── handler.go          # Handlers HTTP, middleware de autorização e rotas HTMX
-│       ├── handler_test.go     # Testes de endpoints HTTP e renderização
+│       ├── handler.go          # Rotas, página inicial (shell) e arquivos estáticos
+│       ├── auth.go             # Credenciais (header/URL) e autorização de professor
+│       ├── handler_*.go        # Setup, alunos, importação, chamada e resumo
+│       ├── *_test.go           # Testes de endpoints HTTP e renderização
+│       ├── static/widget.js    # Handshake get_openid com o Element, token em header, download
 │       └── templates/          # Templates HTML embutidos com HTMX e Tailwind
-│           ├── layout.html
+│           ├── layout.html     # Documento (shell ou página completa)
+│           ├── app.html        # Corpo do widget: cabeçalho, abas e conteúdo
 │           ├── setup.html
 │           ├── roster.html
 │           ├── attendance.html

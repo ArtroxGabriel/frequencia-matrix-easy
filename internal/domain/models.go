@@ -73,11 +73,15 @@ type AttendanceEntry struct {
 	IsPresent bool   `json:"isPresent"`
 }
 
+// AttendanceSession is one class day. A Cancelled session records that the
+// class did not happen: it carries no entries and counts as no absence for
+// anyone.
 type AttendanceSession struct {
 	ID          string            `json:"id"`
 	RoomID      string            `json:"roomId"`
 	ClassDate   string            `json:"classDate"` // YYYY-MM-DD
 	PeriodCount int               `json:"periodCount"`
+	Cancelled   bool              `json:"cancelled"`
 	Entries     []AttendanceEntry `json:"entries"`
 	CreatedAt   time.Time         `json:"createdAt"`
 }
@@ -89,16 +93,29 @@ func (a AttendanceSession) Validate() error {
 	if strings.TrimSpace(a.ClassDate) == "" {
 		return fmt.Errorf("attendance session classDate cannot be empty, got: %q", a.ClassDate)
 	}
-	if a.PeriodCount <= 0 {
+	if !a.Cancelled && a.PeriodCount <= 0 {
 		return fmt.Errorf("attendance session periodCount must be > 0, got: %d", a.PeriodCount)
 	}
 	return nil
 }
 
+// AttendanceStatus classifies a student's absences against the allowed limit.
+type AttendanceStatus string
+
+const (
+	StatusOK      AttendanceStatus = "OK"
+	StatusWarning AttendanceStatus = "WARNING"
+	StatusFailed  AttendanceStatus = "FAILED"
+)
+
 type StudentSummary struct {
-	Student           Student `json:"student"`
-	Presences         int     `json:"presences"`
-	Absences          int     `json:"absences"`
-	AttendancePercent float64 `json:"attendancePercent"`
-	IsApproved        bool    `json:"isApproved"`
+	Student           Student          `json:"student"`
+	Presences         int              `json:"presences"`
+	Absences          int              `json:"absences"`
+	AbsencePercent    float64          `json:"absencePercent"`
+	AttendancePercent float64          `json:"attendancePercent"`
+	MaxAbsences       int              `json:"maxAbsences"`
+	RemainingAbsences int              `json:"remainingAbsences"`
+	Status            AttendanceStatus `json:"status"`
+	IsApproved        bool             `json:"isApproved"`
 }

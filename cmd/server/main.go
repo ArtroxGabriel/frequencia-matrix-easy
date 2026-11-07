@@ -38,7 +38,11 @@ func main() {
 		log.Fatalf("failed initializing matrix gateway: %v", err)
 	}
 
-	handler, err := web.NewHandler(s, gw)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	startAutoJoin(ctx, gw, cfg.AutoJoinServers)
+
+	handler, err := web.NewHandler(s, gw, web.WithPINSessionTTL(cfg.PINSessionTTL))
 	if err != nil {
 		log.Fatalf("failed creating web handler: %v", err)
 	}
@@ -60,6 +64,25 @@ func createMatrixGateway(cfg Config) (matrix.MatrixGateway, error) {
 		return matrix.NewFakeMatrixClient(true), nil
 	}
 	return matrix.NewMautrixGateway(cfg.HomeserverURL, cfg.UserID, cfg.AccessToken)
+}
+
+// startAutoJoin makes the bot accept room invites in the background, when the
+// gateway supports it (the development fake does not).
+func startAutoJoin(ctx context.Context, gw matrix.MatrixGateway, allowedServers []string) {
+	acceptor, ok := gw.(matrix.InviteAcceptor)
+	if !ok {
+		return
+	}
+	if len(allowedServers) == 0 {
+		log.Println("[WARN] MATRIX_AUTOJOIN_SERVERS is empty: the bot accepts invites from any homeserver")
+	} else {
+		log.Printf("[INFO] the bot accepts invites only from: %v", allowedServers)
+	}
+	go func() {
+		if err := acceptor.RunAutoJoin(ctx, allowedServers); err != nil {
+			log.Printf("[ERROR] accepting room invites stopped: %v", err)
+		}
+	}()
 }
 
 func runServer(server *http.Server, port int, devMode bool) {

@@ -6,6 +6,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"frequencia-matrix-integration/internal/web"
 )
 
 type Config struct {
@@ -15,6 +18,13 @@ type Config struct {
 	UserID        string
 	AccessToken   string
 	DevMode       bool
+
+	// AutoJoinServers limits which homeservers the bot accepts invites from.
+	// Empty means any server.
+	AutoJoinServers []string
+
+	// PINSessionTTL is how long a session opened with a room PIN lasts.
+	PINSessionTTL time.Duration
 }
 
 func LoadConfig() Config {
@@ -42,7 +52,31 @@ func LoadConfig() Config {
 		UserID:        os.Getenv("MATRIX_USER_ID"),
 		AccessToken:   os.Getenv("MATRIX_ACCESS_TOKEN"),
 		DevMode:       devMode,
+
+		AutoJoinServers: parseServerList(os.Getenv("MATRIX_AUTOJOIN_SERVERS")),
+		PINSessionTTL:   parsePINSessionTTL(os.Getenv("PIN_SESSION_TTL")),
 	}
+}
+
+// parsePINSessionTTL reads a duration such as "24h" or "90m". An empty,
+// invalid or non-positive value falls back to the default, like PORT does.
+func parsePINSessionTTL(raw string) time.Duration {
+	ttl, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil || ttl <= 0 {
+		return web.DefaultPINSessionTTL
+	}
+	return ttl
+}
+
+// parseServerList splits a comma-separated list, dropping blanks.
+func parseServerList(raw string) []string {
+	var servers []string
+	for _, item := range strings.Split(raw, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			servers = append(servers, item)
+		}
+	}
+	return servers
 }
 
 func (c Config) Validate() error {

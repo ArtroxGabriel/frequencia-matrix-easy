@@ -14,6 +14,8 @@ import (
 const (
 	SheetGraduacao    = "Graduacao"
 	SheetPosGraduacao = "Pos-Graduacao"
+
+	markNoClass = "S/A"
 )
 
 func ExportAttendanceXLSX(course domain.CourseConfig, students []domain.Student, sessions []domain.AttendanceSession) ([]byte, error) {
@@ -86,12 +88,8 @@ func populateSheet(f *excelize.File, sheet string, students []domain.Student, cl
 		colName, _ := excelize.ColumnNumberToName(colIdx)
 		_ = f.SetColWidth(sheet, colName, colName, 28)
 
-		headerTitle := stu.FullName
-		if stu.RegistrationNumber != "" {
-			headerTitle = fmt.Sprintf("%s (%s)", stu.FullName, stu.RegistrationNumber)
-		}
 		cell := cellName(colIdx, 1)
-		_ = f.SetCellValue(sheet, cell, headerTitle)
+		_ = f.SetCellValue(sheet, cell, studentHeader(stu))
 		_ = f.SetCellStyle(sheet, cell, cell, headerStyle)
 	}
 
@@ -132,6 +130,8 @@ func writeSummaryRows(f *excelize.File, sheet string, startRow int, students []d
 	lines := []summaryLine{
 		{label: "Presenças", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%d", s.Presences) }},
 		{label: "Faltas", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%d", s.Absences) }},
+		{label: "% Faltas", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%.1f%%", s.AbsencePercent) }},
+		{label: "Faltas restantes", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%d", s.RemainingAbsences) }},
 		{label: "% Frequência", getValue: func(s domain.StudentSummary) any { return fmt.Sprintf("%.1f%%", s.AttendancePercent) }},
 		{label: "Situação", getValue: func(s domain.StudentSummary) any {
 			if s.IsApproved {
@@ -159,7 +159,23 @@ func formatDateDisplay(dateStr string) string {
 	return t.Format("02/01/2006")
 }
 
+// studentHeader labels a column with name and registration, flagging students
+// who were removed from the roster but still have recorded history.
+func studentHeader(stu domain.Student) string {
+	title := stu.FullName
+	if stu.RegistrationNumber != "" {
+		title = fmt.Sprintf("%s (%s)", stu.FullName, stu.RegistrationNumber)
+	}
+	if !stu.Active {
+		title += " — inativo"
+	}
+	return title
+}
+
 func getAttendanceMark(sess domain.AttendanceSession, studentID string) string {
+	if sess.Cancelled {
+		return markNoClass
+	}
 	for _, e := range sess.Entries {
 		if e.StudentID == studentID {
 			if e.IsPresent {
