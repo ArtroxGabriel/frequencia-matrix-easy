@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"frequencia-matrix-integration/internal/domain"
@@ -18,6 +19,10 @@ var ErrNotFound = errors.New("record not found")
 
 type Store struct {
 	db *sql.DB
+
+	// pinMu serialises PIN logins so that concurrent wrong guesses cannot
+	// slip past the attempt counter.
+	pinMu sync.Mutex
 }
 
 func NewStore(dbPath string) (*Store, error) {
