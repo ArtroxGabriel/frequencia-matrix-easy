@@ -286,7 +286,7 @@ func TestSetupTabOffersPINManagementOnlyToIdentifiedTeachers(t *testing.T) {
 	if !strings.Contains(teacher.Body.String(), `id="pin-card"`) || !strings.Contains(teacher.Body.String(), "Gerar novo PIN") {
 		t.Errorf("the teacher should manage the PIN (and see 'Gerar novo PIN' since one exists): %s", teacher.Body.String())
 	}
-	if !strings.Contains(teacher.Body.String(), "hx-confirm") {
+	if !strings.Contains(teacher.Body.String(), "data-confirm-label") {
 		t.Error("replacing an existing PIN should ask for confirmation")
 	}
 
@@ -316,7 +316,7 @@ func TestFirstPINOffersGenerateWithoutConfirmation(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Gerar PIN") || strings.Contains(body, "hx-confirm") {
+	if !strings.Contains(body, "Gerar PIN") || strings.Contains(body, "data-confirm-label") {
 		t.Errorf("a room without PIN should offer 'Gerar PIN' without confirmation: %s", body)
 	}
 }

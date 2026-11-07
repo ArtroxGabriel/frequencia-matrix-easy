@@ -247,6 +247,40 @@
         highlightTab(event.detail.elt);
     });
 
+    // Two-step confirmation for destructive buttons, in place of the native
+    // confirm() dialog: iframes and WebViews of widget clients can silently
+    // block it, which would make the button look dead. The first tap changes
+    // the label, the second one (within CONFIRM_WINDOW_MS) goes through to htmx.
+    var CONFIRM_WINDOW_MS = 5000;
+
+    function disarm(button) {
+        clearTimeout(button._confirmTimer);
+        if (button._originalHTML !== undefined) { button.innerHTML = button._originalHTML; }
+        button.removeAttribute('data-armed');
+        button.classList.remove('ring-2', 'ring-red-400');
+    }
+
+    function arm(button) {
+        button._originalHTML = button.innerHTML;
+        button.textContent = button.getAttribute('data-confirm-label');
+        button.setAttribute('data-armed', 'true');
+        button.classList.add('ring-2', 'ring-red-400');
+        button._confirmTimer = setTimeout(function () { disarm(button); }, CONFIRM_WINDOW_MS);
+    }
+
+    // Capture phase: it must run before htmx sees the click.
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-confirm-label]');
+        if (!button) { return; }
+        if (button.getAttribute('data-armed') === 'true') {
+            disarm(button);
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        arm(button);
+    }, true);
+
     document.addEventListener('click', function (event) {
         var button = event.target.closest('[data-download]');
         if (!button) { return; }

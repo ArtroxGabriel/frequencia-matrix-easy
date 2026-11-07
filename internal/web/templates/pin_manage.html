@@ -14,7 +14,7 @@
             hx-post="/widget/pin/regenerate?roomId={{.RoomID}}"
             hx-target="#pin-card"
             hx-swap="outerHTML"
-            {{if .PinSet}}hx-confirm="Gerar um novo PIN desativa o atual e encerra os acessos abertos com ele. Continuar?"{{end}}
+            {{if .PinSet}}data-confirm-label="Confirmar: o PIN atual deixa de valer"{{end}}
             class="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 rounded text-sm font-medium text-slate-700 transition">
         {{if .PinSet}}🔄 Gerar novo PIN{{else}}🔑 Gerar PIN{{end}}
     </button>

@@ -81,7 +81,7 @@
                     </div>
                     <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}"
                             hx-target="#tab-content"
-                            hx-confirm="Deseja remover este aluno?"
+                            data-confirm-label="Confirmar remoção"
                             class="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded transition">
                         Remover
                     </button>
@@ -107,7 +107,7 @@
                     </div>
                     <button hx-delete="/widget/students/{{.ID}}?roomId={{$.RoomID}}"
                             hx-target="#tab-content"
-                            hx-confirm="Deseja remover este aluno?"
+                            data-confirm-label="Confirmar remoção"
                             class="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded transition">
                         Remover
                     </button>

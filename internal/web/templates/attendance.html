@@ -98,7 +98,7 @@
                     hx-post="/widget/attendance/cancel?roomId={{.RoomID}}"
                     hx-vals='{"cancelled": "true"}'
                     hx-target="#tab-content"
-                    {{if .SessionExists}}hx-confirm="Marcar este dia como sem aula? As faltas já registradas nele serão descartadas."{{end}}
+                    {{if .SessionExists}}data-confirm-label="Descartar as faltas deste dia?"{{end}}
                     class="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 rounded text-sm text-slate-600 transition">
                 Sem aula neste dia
             </button>
