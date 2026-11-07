@@ -20,6 +20,8 @@ Integração de chamada e controle de frequência para salas Matrix e Element We
 
 ## Como Executar Localmente
 
+> Guia completo, com os scripts de stack local e de Tailscale: [docs/COMO-RODAR.md](docs/COMO-RODAR.md).
+
 ### 1. Modo de Desenvolvimento Rápido (Dev Mode)
 
 Para testar a interface do widget e a exportação XLSX sem precisar de um servidor Matrix ativo:
