@@ -77,6 +77,16 @@ O bot (`MATRIX_USER_ID`) precisa estar na sala: é ele que consulta os níveis d
 
 Para impedir que o bot entre em salas de qualquer servidor, restrinja quem pode convidá-lo com `MATRIX_AUTOJOIN_SERVERS`. Convites de outros servidores são recusados, e o Element mostra que o bot recusou.
 
+### Acesso por PIN (clientes sem OpenID)
+
+O app **Element para Android** não implementa a ação `get_openid` da Widget API, então o widget nunca recebe o token de identidade ali. Para esses clientes, cada sala pode ter um **PIN de 6 dígitos**:
+
+1. O professor abre o widget no **Element Web** (onde a identidade é confirmada), vai em **Configuração > Acesso pelo celular (PIN)** e clica em **Gerar PIN**. O PIN aparece **uma única vez**: anote-o.
+2. No app do celular, o widget mostra um campo de PIN. Com o PIN correto, o acesso dura 24 horas (ajustável com `PIN_SESSION_TTL`) e fica guardado no aparelho.
+3. **Gerar novo PIN** desativa o anterior e encerra todos os acessos abertos com ele.
+
+Regras de segurança: só o professor identificado por OpenID cria ou troca o PIN (uma sessão aberta por PIN não pode); o servidor guarda apenas o hash; 5 erros seguidos bloqueiam a sala por 15 minutos, dobrando a cada nova rodada, até 24 horas; o token de sessão trafega só em header, nunca na URL. Quem tem o PIN acessa como professor da sala e não há registro de quem fez cada chamada. Use sempre HTTPS, senão o PIN trafega em texto aberto. O acesso por OpenID continua igual e não pede PIN.
+
 Configure as variáveis de ambiente:
 
 | Variável | Descrição | Exemplo |
@@ -87,6 +97,7 @@ Configure as variáveis de ambiente:
 | `MATRIX_USER_ID` | ID do bot da integração | `@frequencia-bot:matrix.dc.ufc.br` |
 | `MATRIX_ACCESS_TOKEN` | Token de acesso da conta bot | `syt_...` |
 | `MATRIX_AUTOJOIN_SERVERS` | Servidores cujos usuários podem convidar o bot, separados por vírgula. Vazio aceita qualquer servidor | `matrix.dc.ufc.br` |
+| `PIN_SESSION_TTL` | Duração do acesso aberto com o PIN (`24h` por padrão) | `12h` |
 | `DEV_MODE` | `false` em produção | `false` |
 
 ---

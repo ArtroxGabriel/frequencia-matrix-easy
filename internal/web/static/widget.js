@@ -9,6 +9,11 @@
  * Outside Element (direct browsing, development) there is no parent frame to
  * ask. The page then relies on the "openIdToken" or "userId" query parameters,
  * which are forwarded as headers.
+ *
+ * Clients that do not implement get_openid (Element Android) never provide a
+ * token. There the teacher types the room PIN, the server answers with a
+ * session token in the X-Session-Token header, and this script keeps it and
+ * sends it on every request, in a header and never in a URL.
  */
 (function () {
     'use strict';
@@ -24,11 +29,27 @@
     var USER_CONFIRM_TIMEOUT_MS = 300000;
     var RETRY_AFTER_FAILURE_MS = 60000;
 
+    var SESSION_HEADER = 'X-Session-Token';
+    var sessionKey = 'frequencia.session.' + roomId;
+
     var credentials = { token: params.get('openIdToken') || '', expiresAt: Infinity };
     var lastFailure = 0;
     var inFlight = null;
     var pending = {};
     var waitingForWidgetId = [];
+
+    // Storage can be unavailable (blocked third-party storage, private mode):
+    // the session then lasts until the page is closed.
+    function readSession() {
+        try { return window.localStorage.getItem(sessionKey) || ''; } catch (e) { return ''; }
+    }
+
+    function keepSession(token) {
+        sessionToken = token;
+        try { window.localStorage.setItem(sessionKey, token); } catch (e) { /* kept in memory only */ }
+    }
+
+    var sessionToken = readSession();
 
     function post(message) {
         window.parent.postMessage(message, '*');
@@ -151,6 +172,7 @@
         var headers = {};
         if (credentials.token) { headers['X-OpenID-Token'] = credentials.token; }
         if (devUser) { headers['X-Dev-User'] = devUser; }
+        if (sessionToken) { headers[SESSION_HEADER] = sessionToken; }
         return headers;
     }
 
@@ -212,6 +234,13 @@
             event.detail.shouldSwap = true;
             event.detail.isError = false;
         }
+    });
+
+    // The PIN login answers with the session token.
+    document.addEventListener('htmx:afterRequest', function (event) {
+        var xhr = event.detail.xhr;
+        var token = xhr && xhr.getResponseHeader(SESSION_HEADER);
+        if (token) { keepSession(token); }
     });
 
     document.addEventListener('htmx:beforeRequest', function (event) {
