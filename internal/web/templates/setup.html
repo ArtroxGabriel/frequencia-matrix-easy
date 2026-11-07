@@ -78,4 +78,6 @@
         sync();
     })();
     </script>
+
+    {{if .CanManagePIN}}{{template "pin_manage" .}}{{end}}
 </div>

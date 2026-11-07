@@ -42,7 +42,7 @@ func main() {
 	defer cancel()
 	startAutoJoin(ctx, gw, cfg.AutoJoinServers)
 
-	handler, err := web.NewHandler(s, gw)
+	handler, err := web.NewHandler(s, gw, web.WithPINSessionTTL(cfg.PINSessionTTL))
 	if err != nil {
 		log.Fatalf("failed creating web handler: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"time"
 
 	"frequencia-matrix-integration/internal/matrix"
 	"frequencia-matrix-integration/internal/store"
@@ -17,14 +18,32 @@ var templateFS embed.FS
 //go:embed static
 var staticFS embed.FS
 
+// DefaultPINSessionTTL is how long a session opened with a room PIN lasts.
+const DefaultPINSessionTTL = 24 * time.Hour
+
 type Handler struct {
 	store  *store.Store
 	matrix matrix.MatrixGateway
 	mux    *http.ServeMux
 	tmpl   *template.Template
+
+	pinSessionTTL time.Duration
 }
 
-func NewHandler(s *store.Store, mg matrix.MatrixGateway) (*Handler, error) {
+// Option customises a Handler.
+type Option func(*Handler)
+
+// WithPINSessionTTL sets how long a PIN session lasts. Non-positive values
+// are ignored and the default is kept.
+func WithPINSessionTTL(ttl time.Duration) Option {
+	return func(h *Handler) {
+		if ttl > 0 {
+			h.pinSessionTTL = ttl
+		}
+	}
+}
+
+func NewHandler(s *store.Store, mg matrix.MatrixGateway, opts ...Option) (*Handler, error) {
 	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing web templates: %w", err)
@@ -35,6 +54,11 @@ func NewHandler(s *store.Store, mg matrix.MatrixGateway) (*Handler, error) {
 		matrix: mg,
 		mux:    http.NewServeMux(),
 		tmpl:   tmpl,
+
+		pinSessionTTL: DefaultPINSessionTTL,
+	}
+	for _, opt := range opts {
+		opt(h)
 	}
 	h.registerRoutes()
 	return h, nil
@@ -61,6 +85,8 @@ func (h *Handler) registerRoutes() {
 	h.mux.HandleFunc("POST /widget/attendance/cancel", h.authWrap(h.handleCancelClass))
 	h.mux.HandleFunc("GET /widget/tab/summary", h.authWrap(h.handleTabSummary))
 	h.mux.HandleFunc("GET /widget/export.xlsx", h.authWrap(h.handleExportXLSX))
+	h.mux.HandleFunc("POST /widget/pin/login", h.handlePINLogin)
+	h.mux.HandleFunc("POST /widget/pin/regenerate", h.teacherOnly(h.handleRegeneratePIN))
 }
 
 func (h *Handler) handleHealthz(w http.ResponseWriter, _ *http.Request) {
@@ -84,7 +110,7 @@ func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) pageData(ctx context.Context, ident matrix.UserIdentity) map[string]any {
 	cfg, _ := h.store.GetCourseConfig(ctx, ident.RoomID)
 	if cfg.RoomID == "" {
-		return h.buildSetupData(ident.RoomID, ident.UserID, cfg, false)
+		return h.buildSetupData(ctx, ident.RoomID, ident.UserID, cfg, false)
 	}
 	return h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, h.defaultClassDate(cfg))
 }

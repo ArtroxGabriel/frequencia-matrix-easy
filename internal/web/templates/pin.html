@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso do professor</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-4">
+    <div id="app">
+        {{template "pin_card" .}}
+    </div>
+    <script src="/static/widget.js"></script>
+</body>
+</html>
+
+{{define "pin_card"}}
+<div class="max-w-sm w-full mx-auto mt-6 bg-white p-6 rounded-xl shadow-md border border-slate-200 text-center">
+    <div class="w-14 h-14 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🔑</div>
+    <h2 class="text-xl font-bold text-slate-900 mb-1">Acesso do professor</h2>
+    <p class="text-sm text-slate-600 mb-5">Digite o PIN de 6 dígitos desta sala.</p>
+    <form id="pin-form" hx-post="/widget/pin/login?roomId={{.RoomID}}" hx-target="#app" hx-swap="innerHTML" class="space-y-4">
+        <input id="pin-input" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               autocomplete="off" autofocus aria-label="PIN" {{if .Locked}}disabled{{end}}
+               class="w-full px-3 py-3 border border-slate-300 rounded text-center text-2xl tracking-widest focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-100">
+        <button type="submit" {{if .Locked}}disabled{{end}}
+                class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded font-medium text-sm transition">
+            Entrar
+        </button>
+        {{if .Locked}}<p class="text-xs text-slate-500">Muitas tentativas. Tente novamente mais tarde.</p>{{end}}
+    </form>
+    <script>
+    (function () {
+        var form = document.getElementById('pin-form');
+        var input = document.getElementById('pin-input');
+        if (!form || !input) { return; }
+        input.addEventListener('input', function () {
+            if (input.value.length === 6) { form.requestSubmit(); }
+        });
+    })();
+    </script>
+</div>
+{{end}}

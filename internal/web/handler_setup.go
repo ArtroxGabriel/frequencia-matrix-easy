@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strconv"
@@ -13,11 +14,11 @@ import (
 
 func (h *Handler) handleTabSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	h.renderSetup(w, ident, cfg, false)
+	h.renderSetup(r.Context(), w, ident, cfg, false)
 }
 
-func (h *Handler) renderSetup(w http.ResponseWriter, ident matrix.UserIdentity, cfg domain.CourseConfig, saved bool) {
-	data := h.buildSetupData(ident.RoomID, ident.UserID, cfg, saved)
+func (h *Handler) renderSetup(ctx context.Context, w http.ResponseWriter, ident matrix.UserIdentity, cfg domain.CourseConfig, saved bool) {
+	data := h.buildSetupData(ctx, ident.RoomID, ident.UserID, cfg, saved)
 	_ = h.tmpl.ExecuteTemplate(w, "setup.html", data)
 }
 
@@ -33,7 +34,7 @@ func (h *Handler) handlePostSetup(w http.ResponseWriter, r *http.Request, ident 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	h.renderSetup(w, ident, cfg, true)
+	h.renderSetup(r.Context(), w, ident, cfg, true)
 }
 
 func parseCourseForm(r *http.Request, roomID string) (domain.CourseConfig, bool) {
@@ -75,7 +76,7 @@ func parseWeekdays(values []string) []time.Weekday {
 	return days
 }
 
-func (h *Handler) buildSetupData(roomID, userID string, cfg domain.CourseConfig, saved bool) map[string]any {
+func (h *Handler) buildSetupData(ctx context.Context, roomID, userID string, cfg domain.CourseConfig, saved bool) map[string]any {
 	weekdayChecked := make(map[int]bool)
 	for _, w := range cfg.Weekdays {
 		weekdayChecked[int(w)] = true
@@ -92,5 +93,7 @@ func (h *Handler) buildSetupData(roomID, userID string, cfg domain.CourseConfig,
 		"StartDateFormatted": startFormatted,
 		"Saved":              saved,
 		"IsSetupTab":         true,
+		"CanManagePIN":       userID != pinUserID,
+		"PinSet":             h.roomHasPIN(ctx, roomID),
 	}
 }

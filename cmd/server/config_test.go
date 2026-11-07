@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 func TestConfigDefaultsAndValidation(t *testing.T) {
@@ -96,5 +97,25 @@ func TestLoadConfigAutoJoinServers(t *testing.T) {
 	t.Setenv("MATRIX_AUTOJOIN_SERVERS", "")
 	if got := LoadConfig().AutoJoinServers; len(got) != 0 {
 		t.Errorf("AutoJoinServers = %q, want empty (any server)", got)
+	}
+}
+
+func TestPINSessionTTLFromEnv(t *testing.T) {
+	tests := []struct {
+		env  string
+		want time.Duration
+	}{
+		{"", 24 * time.Hour},
+		{"12h", 12 * time.Hour},
+		{" 90m ", 90 * time.Minute},
+		{"0", 24 * time.Hour},
+		{"-5h", 24 * time.Hour},
+		{"soon", 24 * time.Hour},
+	}
+	for _, tt := range tests {
+		t.Setenv("PIN_SESSION_TTL", tt.env)
+		if got := LoadConfig().PINSessionTTL; got != tt.want {
+			t.Errorf("PIN_SESSION_TTL=%q -> %v, want %v", tt.env, got, tt.want)
+		}
 	}
 }

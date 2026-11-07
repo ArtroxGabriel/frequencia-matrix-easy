@@ -1,0 +1,22 @@
+{{define "pin_manage"}}
+<section id="pin-card" class="border-t border-slate-200 pt-5 space-y-3 max-w-lg">
+    <div>
+        <h3 class="text-sm font-semibold text-slate-800">Acesso pelo celular (PIN)</h3>
+        <p class="text-xs text-slate-500">Para clientes que não confirmam a identidade, como o app Element para Android. Quem tem o PIN acessa esta sala como professor.</p>
+    </div>
+    {{if .Pin}}
+    <div class="flex flex-wrap items-center gap-3">
+        <code id="pin-value" class="px-3 py-2 bg-slate-100 border border-slate-200 rounded text-xl font-mono tracking-widest text-slate-900">{{.Pin}}</code>
+        <span class="text-xs text-slate-500">Anote agora. Ele não será mostrado de novo.</span>
+    </div>
+    {{end}}
+    <button type="button"
+            hx-post="/widget/pin/regenerate?roomId={{.RoomID}}"
+            hx-target="#pin-card"
+            hx-swap="outerHTML"
+            {{if .PinSet}}hx-confirm="Gerar um novo PIN desativa o atual e encerra os acessos abertos com ele. Continuar?"{{end}}
+            class="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-100 rounded text-sm font-medium text-slate-700 transition">
+        {{if .PinSet}}🔄 Gerar novo PIN{{else}}🔑 Gerar PIN{{end}}
+    </button>
+</section>
+{{end}}
