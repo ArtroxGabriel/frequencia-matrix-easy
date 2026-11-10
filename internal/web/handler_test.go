@@ -302,3 +302,53 @@ func TestHandlerErrorBranches(t *testing.T) {
 		t.Errorf("expected 200 OK for index after unauthorized request, got %d", recIndexAfter.Code)
 	}
 }
+
+func TestHandlerStoreFailureReturnsInternalServerError(t *testing.T) {
+	s, fakeMatrix, handler := setupTestServer(t)
+	roomID := "!course:matrix.dc.ufc.br"
+	teacherID := "@prof:matrix.dc.ufc.br"
+	fakeMatrix.SetUserPowerLevel(roomID, teacherID, 100)
+	fakeMatrix.RegisterOpenIDToken("teacher-token", matrix.UserIdentity{
+		UserID: teacherID,
+		RoomID: roomID,
+	})
+	authQuery := "?roomId=" + url.QueryEscape(roomID) + "&openIdToken=teacher-token"
+
+	// Close the underlying database to simulate a store failure.
+	_ = s.Close()
+
+	endpoints := []struct {
+		method string
+		path   string
+		form   url.Values
+	}{
+		{http.MethodGet, "/" + authQuery, nil},
+		{http.MethodGet, "/widget/home" + authQuery, nil},
+		{http.MethodGet, "/widget/tab/setup" + authQuery, nil},
+		{http.MethodGet, "/widget/tab/roster" + authQuery, nil},
+		{http.MethodGet, "/widget/tab/attendance" + authQuery, nil},
+		{http.MethodGet, "/widget/tab/summary" + authQuery, nil},
+		{http.MethodGet, "/widget/export.xlsx" + authQuery, nil},
+		{http.MethodDelete, "/widget/students/stu-1" + authQuery, nil},
+		{http.MethodPost, "/widget/attendance" + authQuery, url.Values{"classDate": {"2026-03-03"}, "periodCount": {"2"}}},
+		{http.MethodPost, "/widget/attendance/cancel" + authQuery, url.Values{"classDate": {"2026-03-03"}, "cancelled": {"false"}}},
+	}
+
+	for _, ep := range endpoints {
+		var body *strings.Reader
+		if ep.form != nil {
+			body = strings.NewReader(ep.form.Encode())
+		} else {
+			body = strings.NewReader("")
+		}
+		req := httptest.NewRequest(ep.method, ep.path, body)
+		if ep.form != nil {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("%s %s: expected 500 on store error, got %d", ep.method, ep.path, rec.Code)
+		}
+	}
+}

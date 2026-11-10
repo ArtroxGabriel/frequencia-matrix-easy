@@ -2,12 +2,15 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"frequencia-matrix-integration/internal/domain"
 	"frequencia-matrix-integration/internal/matrix"
+	"frequencia-matrix-integration/internal/store"
 )
 
 const defaultPeriodsPerClass = 2
@@ -41,7 +44,11 @@ func (h *Handler) defaultClassDate(cfg domain.CourseConfig) string {
 }
 
 func (h *Handler) handleTabAttendance(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
+	cfg, err := h.loadCourseConfig(r.Context(), ident.RoomID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	date := r.URL.Query().Get("date")
 	if !domain.IsValidDate(date) {
 		date = h.defaultClassDate(cfg)
@@ -50,7 +57,11 @@ func (h *Handler) handleTabAttendance(w http.ResponseWriter, r *http.Request, id
 }
 
 func (h *Handler) renderAttendance(w http.ResponseWriter, ctx context.Context, ident matrix.UserIdentity, cfg domain.CourseConfig, date string) {
-	data := h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, date)
+	data, err := h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, date)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	_ = h.tmpl.ExecuteTemplate(w, "attendance.html", data)
 }
 
@@ -68,15 +79,25 @@ func (h *Handler) handlePostAttendance(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	previous, prevErr := h.store.GetAttendanceSession(r.Context(), ident.RoomID, classDate)
+	if prevErr != nil && !errors.Is(prevErr, store.ErrNotFound) {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	session := newSession(ident.RoomID, classDate, parsePeriods(r.FormValue("periodCount")), students, r.Form["absent"])
 	if err := h.store.RecordAttendanceSession(r.Context(), session); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if prevErr != nil || previous.Cancelled {
-		_ = h.matrix.SendNotice(r.Context(), ident.RoomID, attendanceNotice(session))
+	if errors.Is(prevErr, store.ErrNotFound) || previous.Cancelled {
+		if err := h.matrix.SendNotice(r.Context(), ident.RoomID, attendanceNotice(session)); err != nil {
+			log.Printf("[WARN] failed sending attendance notice to room %s: %v", ident.RoomID, err)
+		}
 	}
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
+	cfg, err := h.loadCourseConfig(r.Context(), ident.RoomID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	h.renderAttendance(w, r.Context(), ident, cfg, classDate)
 }
 
@@ -99,15 +120,22 @@ func (h *Handler) handleCancelClass(w http.ResponseWriter, r *http.Request, iden
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
+	cfg, err := h.loadCourseConfig(r.Context(), ident.RoomID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	h.renderAttendance(w, r.Context(), ident, cfg, classDate)
 }
 
 // reopenClass deletes a cancelled session only; recorded roll calls are kept.
 func (h *Handler) reopenClass(ctx context.Context, roomID, classDate string) error {
 	existing, err := h.store.GetAttendanceSession(ctx, roomID, classDate)
-	if err != nil || !existing.Cancelled {
+	if errors.Is(err, store.ErrNotFound) || (err == nil && !existing.Cancelled) {
 		return nil
+	}
+	if err != nil {
+		return err
 	}
 	return h.store.DeleteAttendanceSession(ctx, roomID, classDate)
 }
@@ -166,9 +194,15 @@ func absencesPhrase(n int) string {
 	}
 }
 
-func (h *Handler) buildAttendanceData(ctx context.Context, roomID, userID string, cfg domain.CourseConfig, date string) map[string]any {
-	students, _ := h.store.ListStudents(ctx, roomID, true)
-	sessions, _ := h.store.ListAttendanceSessions(ctx, roomID)
+func (h *Handler) buildAttendanceData(ctx context.Context, roomID, userID string, cfg domain.CourseConfig, date string) (map[string]any, error) {
+	students, err := h.store.ListStudents(ctx, roomID, true)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := h.store.ListAttendanceSessions(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
 	current, hasCurrent, others := splitSessions(sessions, date)
 
 	periods := defaultPeriodsPerClass
@@ -195,7 +229,7 @@ func (h *Handler) buildAttendanceData(ctx context.Context, roomID, userID string
 			buildGroup("Pós-Graduação", "purple", posGrad, absent, others, periods),
 		},
 		"IsSetupTab": false,
-	}
+	}, nil
 }
 
 func splitSessions(sessions []domain.AttendanceSession, date string) (current domain.AttendanceSession, found bool, others []domain.AttendanceSession) {

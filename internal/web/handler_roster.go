@@ -1,23 +1,27 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"frequencia-matrix-integration/internal/domain"
 	"frequencia-matrix-integration/internal/matrix"
+	"frequencia-matrix-integration/internal/store"
 )
 
 func (h *Handler) renderRoster(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
+	students, err := h.store.ListStudents(r.Context(), ident.RoomID, true)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	data := h.buildRosterData(ident.RoomID, ident.UserID, students)
 	_ = h.tmpl.ExecuteTemplate(w, "roster.html", data)
 }
 
 func (h *Handler) handleTabRoster(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
-	data := h.buildRosterData(ident.RoomID, ident.UserID, students)
-	_ = h.tmpl.ExecuteTemplate(w, "roster.html", data)
+	h.renderRoster(w, r, ident)
 }
 
 func (h *Handler) handlePostStudent(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
@@ -40,18 +44,16 @@ func (h *Handler) handlePostStudent(w http.ResponseWriter, r *http.Request, iden
 		return
 	}
 
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
-	data := h.buildRosterData(ident.RoomID, ident.UserID, students)
-	_ = h.tmpl.ExecuteTemplate(w, "roster.html", data)
+	h.renderRoster(w, r, ident)
 }
 
 func (h *Handler) handleDeleteStudent(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
 	studentID := r.PathValue("id")
-	_ = h.store.DeactivateStudent(r.Context(), ident.RoomID, studentID)
-
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, true)
-	data := h.buildRosterData(ident.RoomID, ident.UserID, students)
-	_ = h.tmpl.ExecuteTemplate(w, "roster.html", data)
+	if err := h.store.DeactivateStudent(r.Context(), ident.RoomID, studentID); err != nil && !errors.Is(err, store.ErrNotFound) {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	h.renderRoster(w, r, ident)
 }
 
 func (h *Handler) buildRosterData(roomID, userID string, students []domain.Student) map[string]any {

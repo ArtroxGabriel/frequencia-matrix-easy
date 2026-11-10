@@ -13,7 +13,11 @@ import (
 )
 
 func (h *Handler) handleTabSetup(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
+	cfg, err := h.loadCourseConfig(r.Context(), ident.RoomID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	h.renderSetup(r.Context(), w, ident, cfg, false)
 }
 

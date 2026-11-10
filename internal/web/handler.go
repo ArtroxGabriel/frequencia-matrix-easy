@@ -3,11 +3,13 @@ package web
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"time"
 
+	"frequencia-matrix-integration/internal/domain"
 	"frequencia-matrix-integration/internal/matrix"
 	"frequencia-matrix-integration/internal/store"
 )
@@ -107,19 +109,42 @@ func (h *Handler) handleRoot(w http.ResponseWriter, r *http.Request) {
 	h.authWrap(h.handleIndex)(w, r)
 }
 
-func (h *Handler) pageData(ctx context.Context, ident matrix.UserIdentity) map[string]any {
-	cfg, _ := h.store.GetCourseConfig(ctx, ident.RoomID)
+// loadCourseConfig returns the room's course configuration, or an empty
+// CourseConfig when the room has not been configured yet.
+func (h *Handler) loadCourseConfig(ctx context.Context, roomID string) (domain.CourseConfig, error) {
+	cfg, err := h.store.GetCourseConfig(ctx, roomID)
+	if errors.Is(err, store.ErrNotFound) {
+		return domain.CourseConfig{}, nil
+	}
+	return cfg, err
+}
+
+func (h *Handler) pageData(ctx context.Context, ident matrix.UserIdentity) (map[string]any, error) {
+	cfg, err := h.loadCourseConfig(ctx, ident.RoomID)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.RoomID == "" {
-		return h.buildSetupData(ctx, ident.RoomID, ident.UserID, cfg, false)
+		return h.buildSetupData(ctx, ident.RoomID, ident.UserID, cfg, false), nil
 	}
 	return h.buildAttendanceData(ctx, ident.RoomID, ident.UserID, cfg, h.defaultClassDate(cfg))
 }
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	_ = h.tmpl.ExecuteTemplate(w, "layout.html", h.pageData(r.Context(), ident))
+	data, err := h.pageData(r.Context(), ident)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	_ = h.tmpl.ExecuteTemplate(w, "layout.html", data)
 }
 
 // handleHome renders the widget body that the shell loads once it has a token.
 func (h *Handler) handleHome(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	_ = h.tmpl.ExecuteTemplate(w, "app.html", h.pageData(r.Context(), ident))
+	data, err := h.pageData(r.Context(), ident)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	_ = h.tmpl.ExecuteTemplate(w, "app.html", data)
 }

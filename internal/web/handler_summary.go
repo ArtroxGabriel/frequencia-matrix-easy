@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 
 	"frequencia-matrix-integration/internal/domain"
@@ -14,10 +15,28 @@ type summaryGroup struct {
 	Rows  []domain.StudentSummary
 }
 
+func (h *Handler) loadSummaryInputs(ctx context.Context, roomID string) (domain.CourseConfig, []domain.Student, []domain.AttendanceSession, error) {
+	cfg, err := h.loadCourseConfig(ctx, roomID)
+	if err != nil {
+		return domain.CourseConfig{}, nil, nil, err
+	}
+	students, err := h.store.ListStudents(ctx, roomID, false)
+	if err != nil {
+		return domain.CourseConfig{}, nil, nil, err
+	}
+	sessions, err := h.store.ListAttendanceSessions(ctx, roomID)
+	if err != nil {
+		return domain.CourseConfig{}, nil, nil, err
+	}
+	return cfg, students, sessions, nil
+}
+
 func (h *Handler) handleTabSummary(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, false)
-	sessions, _ := h.store.ListAttendanceSessions(r.Context(), ident.RoomID)
+	cfg, students, sessions, err := h.loadSummaryInputs(r.Context(), ident.RoomID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	grad, posGrad := domain.SortAndGroupStudents(students)
 
 	data := map[string]any{
@@ -65,9 +84,11 @@ func countHeldClasses(sessions []domain.AttendanceSession) int {
 }
 
 func (h *Handler) handleExportXLSX(w http.ResponseWriter, r *http.Request, ident matrix.UserIdentity) {
-	cfg, _ := h.store.GetCourseConfig(r.Context(), ident.RoomID)
-	students, _ := h.store.ListStudents(r.Context(), ident.RoomID, false)
-	sessions, _ := h.store.ListAttendanceSessions(r.Context(), ident.RoomID)
+	cfg, students, sessions, err := h.loadSummaryInputs(r.Context(), ident.RoomID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	bytesData, err := export.ExportAttendanceXLSX(cfg, students, sessions)
 	if err != nil {

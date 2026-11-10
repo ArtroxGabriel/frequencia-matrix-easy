@@ -30,9 +30,14 @@ func (h *Handler) handlePINLogin(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil:
 		ident := matrix.UserIdentity{UserID: pinUserID, RoomID: roomID}
+		data, dataErr := h.pageData(r.Context(), ident)
+		if dataErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set(headerSessionToken, token)
 		w.Header().Set("Cache-Control", "no-store")
-		_ = h.tmpl.ExecuteTemplate(w, "app.html", h.pageData(r.Context(), ident))
+		_ = h.tmpl.ExecuteTemplate(w, "app.html", data)
 	case errors.Is(err, store.ErrPINLocked):
 		h.renderPINForm(w, r, roomID, true)
 	case errors.Is(err, store.ErrPINInvalid):
