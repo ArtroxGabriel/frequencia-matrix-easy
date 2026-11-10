@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -68,6 +69,9 @@ func (m *MautrixGateway) VerifyUser(ctx context.Context, roomID string, openIDTo
 	var info openIDUserInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return UserIdentity{}, fmt.Errorf("failed decoding openid response: %w", err)
+	}
+	if strings.TrimSpace(info.Sub) == "" {
+		return UserIdentity{}, fmt.Errorf("%w: empty sub in openid response", ErrUnauthorized)
 	}
 
 	return UserIdentity{

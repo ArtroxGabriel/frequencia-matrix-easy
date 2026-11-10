@@ -89,9 +89,14 @@ func TestMautrixGatewayVerifyUser(t *testing.T) {
 	// Mock homeserver for OpenID verification
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("access_token")
-		if token == "valid-token" {
+		switch token {
+		case "valid-token":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"sub":"@prof:matrix.dc.ufc.br"}`))
+			return
+		case "empty-sub-token":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"sub":"   "}`))
 			return
 		}
 		w.WriteHeader(http.StatusUnauthorized)
@@ -111,6 +116,11 @@ func TestMautrixGatewayVerifyUser(t *testing.T) {
 	// Invalid token
 	if _, err := gw.VerifyUser(ctx, "!room:matrix.org", "bad-token"); err == nil {
 		t.Errorf("expected error for bad token")
+	}
+
+	// Empty sub in 200 OK response
+	if _, err := gw.VerifyUser(ctx, "!room:matrix.org", "empty-sub-token"); err == nil {
+		t.Errorf("expected error when openid response has empty sub")
 	}
 
 	// Valid token
