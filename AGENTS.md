@@ -100,13 +100,14 @@ start/end HTML-comment markers, without disturbing the rest of the file.
 `cmd/, internal/`
 
 - `cmd/server/` — Application entrypoint, 12-factor configuration loader, and graceful HTTP server lifecycle.
-- `internal/domain/` — Domain models, calendar schedule calculations, attendance percentage math, and Portuguese accent-folded student sorting.
-- `internal/store/` — CGO-free SQLite storage engine with WAL pragmas; embeds migrations from `internal/store/migrations/`.
-- `internal/store/migrations/` — Versioned SQL migration files (`001_initial.sql`). Never edit applied migrations; always add a new version file.
+- `internal/domain/` — Domain models, calendar schedule calculations, attendance percentage math, room PIN validation, and Portuguese accent-folded student sorting.
+- `internal/importer/` — CSV student roster parser supporting UTF-8 BOM, Windows-1252, UTF-16, delimiter auto-detection (`,`, `;`, `\t`), and deduplication.
+- `internal/store/` — CGO-free SQLite storage engine with WAL pragmas, idempotent roster import (`import.go`), room PIN sessions/lockout (`pin.go`), and embedded migrations (`migrations.go`).
+- `internal/store/migrations/` — Versioned SQL migration files (`001_initial.sql`, `002_session_cancelled.sql`, `003_room_pins.sql`). Never edit applied migrations; always add a new version file.
 - `internal/export/` — Two-sheet `.xlsx` workbook generation (`Graduacao` and `Pos-Graduacao`) with dynamic session dates and attendance status.
-- `internal/matrix/` — Matrix gateway interface with production client (`mautrix_client.go`) and test fake (`fake_client.go`).
-- `internal/web/` — HTTP routing, OpenID / power-level authorization middleware, and HTMX handler methods.
-- `internal/web/templates/` — Embedded HTML templates for widget layout, setup, roster, roll call, summary tabs, and unauthorized views.
+- `internal/matrix/` — Matrix gateway interface with production client (`mautrix_client.go`), invite auto-joiner (`autojoin.go`), and test fake (`fake_client.go`).
+- `internal/web/` — HTTP routing, OpenID / PIN session / power-level authorization middleware, embedded static script (`static/widget.js`), and HTMX handler methods.
+- `internal/web/templates/` — Embedded HTML templates for widget layout, app shell, setup, PIN login/management, roster, roll call, summary tabs, and unauthorized views.
 
 ## Common Commands
 All commands should use `Taskfile.yml` or standard Go tools prefixed with `rtk`:
@@ -121,12 +122,13 @@ All commands should use `Taskfile.yml` or standard Go tools prefixed with `rtk`:
 
 ## Environment / Setup
 - **`PORT`**: HTTP server port (default: `8080`).
-- **`DB_PATH`**: Path to SQLite database file (default: `data/attendance.db`).
+- **`DB_PATH`**: Path to SQLite database file (default: `data/frequencia.db`).
 - **`DEV_MODE`**: When `true`, uses `FakeMatrixClient` bypassing homeserver connectivity (default: `false`).
 - **`MATRIX_HOMESERVER_URL`**: Homeserver base URL (e.g., `https://matrix.dc.ufc.br`).
-- **`MATRIX_ROOM_ID`**: (Optional) Default room ID.
-- **`MATRIX_USER_ID`**: Matrix Bot user ID for notices (e.g., `@frequencia-bot:matrix.dc.ufc.br`).
-- **`MATRIX_ACCESS_TOKEN`**: Bot access token for sending room notices.
+- **`MATRIX_USER_ID`**: Matrix Bot user ID for notices and power-level lookups (e.g., `@frequencia-bot:matrix.dc.ufc.br`).
+- **`MATRIX_ACCESS_TOKEN`**: Bot access token for reading room state and sending room notices.
+- **`MATRIX_AUTOJOIN_SERVERS`**: Comma-separated list of allowed homeserver domains whose users may invite the bot (empty allows any server).
+- **`PIN_SESSION_TTL`**: Duration of a teacher session opened via a 6-digit room PIN on mobile clients (default: `24h`).
 
 ## Code Quality
 - **Linter**: `golangci-lint` configured via `.golangci.yml` (checks `errcheck`, `govet`, `staticcheck`, `unused`, `gofmt`, `misspell`).
@@ -139,7 +141,7 @@ All commands should use `Taskfile.yml` or standard Go tools prefixed with `rtk`:
 - **Zero CGO**: Pure-Go SQLite (`modernc.org/sqlite`) must be preserved to guarantee static compilation for `FROM scratch`.
 - **SQLite Concurrency in Tests**: In `:memory:` SQLite mode, set `MaxOpenConns(1)` and never execute subqueries while iterating `rows.Next()` to avoid connection pool deadlocks. Buffer headers first, close rows, then fetch entries.
 - **Accent Folding for Names**: Student sorting must use Unicode NFD decomposition and strip non-spacing marks (`unicode.Mn`) before comparison so that accented names (`Érika`, `Ágatha`, `João`) sort naturally (`Erika`, `Agatha`, `Joao`).
-- **Matrix Authorization Boundary**: Power level >= 50 (Moderator/Admin) is required for teacher actions. Students (0) only receive restricted access messages.
+- **Matrix Authorization Boundary**: Power level >= 50 (Moderator/Admin) or Room v12 creator is required for teacher actions. Mobile clients (such as Element Android / Element X) that do not support `get_openid` or return an empty identity fall back to a 6-digit per-room PIN (`X-Session-Token`), while identified students (power level < 50) receive restricted access messages.
 
 ## Known Gotchas
 - `coverage.out` is generated during tests and must remain untracked.
