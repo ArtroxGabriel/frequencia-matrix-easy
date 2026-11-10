@@ -11,16 +11,18 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-var accentFolder = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-
 func NormalizeForSort(s string) string {
-	folded, _, err := transform.String(accentFolder, s)
+	folder := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	folded, _, err := transform.String(folder, s)
 	if err != nil {
 		return strings.ToLower(strings.TrimSpace(s))
 	}
 	return strings.ToLower(strings.TrimSpace(folded))
 }
 
+// CalculateClassDates returns up to totalPeriods scheduled class dates matching
+// weekdays starting at start. Because a class meeting may be 1 period,
+// totalPeriods is the upper bound of distinct class dates in the semester.
 func CalculateClassDates(start time.Time, weekdays []time.Weekday, totalPeriods int) []time.Time {
 	if totalPeriods <= 0 || len(weekdays) == 0 {
 		return nil

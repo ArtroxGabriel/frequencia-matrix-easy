@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -70,4 +71,25 @@ func TestSortAndGroupStudentsWithAccentFolding(t *testing.T) {
 			t.Errorf("posGrad index %d: expected %q, got %q", i, expected, posGrad[i].FullName)
 		}
 	}
+}
+
+func TestNormalizeForSortIsConcurrencySafe(t *testing.T) {
+	names := []string{"Érika Meireles", "Ágatha Nunes", "João Silva", "Ícaro Paz", "Conceição"}
+	want := []string{"erika meireles", "agatha nunes", "joao silva", "icaro paz", "conceicao"}
+
+	var wg sync.WaitGroup
+	for g := 0; g < 16; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				for idx, name := range names {
+					if got := domain.NormalizeForSort(name); got != want[idx] {
+						t.Errorf("NormalizeForSort(%q) = %q, want %q", name, got, want[idx])
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
