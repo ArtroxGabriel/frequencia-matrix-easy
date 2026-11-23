@@ -1,0 +1,40 @@
+services:
+  frequencia:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frequencia-app
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/frequencia.db
+      - DEV_MODE=false
+      - MATRIX_HOMESERVER_URL=${MATRIX_HOMESERVER_URL:?MATRIX_HOMESERVER_URL is required}
+      - MATRIX_USER_ID=${MATRIX_USER_ID:?MATRIX_USER_ID is required}
+      - MATRIX_ACCESS_TOKEN=${MATRIX_ACCESS_TOKEN:?MATRIX_ACCESS_TOKEN is required}
+      - MATRIX_AUTOJOIN_SERVERS=${MATRIX_AUTOJOIN_SERVERS:-}
+      - PIN_SESSION_TTL=${PIN_SESSION_TTL:-24h}
+    volumes:
+      - frequencia_data:/app/data
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: frequencia-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - DOMAIN=${DOMAIN:?DOMAIN is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frequencia
+
+volumes:
+  frequencia_data:
+  caddy_data:
+  caddy_config:

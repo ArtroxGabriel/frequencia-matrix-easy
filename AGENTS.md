@@ -94,7 +94,7 @@ start/end HTML-comment markers, without disturbing the rest of the file.
 - **Spreadsheet Engine**: `github.com/xuri/excelize/v2`
 - **Matrix Integration**: `maunium.net/go/mautrix` (OpenID token verification, room power levels, room notices)
 - **Task Runner**: Task (`Taskfile.yml`)
-- **Deployment**: Multi-stage static Docker container (`FROM scratch`, non-root user `10001:10001`), Docker Compose (`docker-compose.yml`)
+- **Deployment**: Multi-stage static Docker container (`FROM scratch`, non-root user `10001:10001`), local Docker Compose (`docker-compose.yml`), production Compose + Caddy TLS (`docker-compose.prod.yml`, `Caddyfile`)
 
 ## File Structure
 `cmd/, internal/`
@@ -108,6 +108,8 @@ start/end HTML-comment markers, without disturbing the rest of the file.
 - `internal/matrix/` — Matrix gateway interface with production client (`mautrix_client.go`), invite auto-joiner (`autojoin.go`), and test fake (`fake_client.go`).
 - `internal/web/` — HTTP routing, OpenID / PIN session / power-level authorization middleware, embedded static script (`static/widget.js`), and HTMX handler methods.
 - `internal/web/templates/` — Embedded HTML templates for widget layout, app shell, setup, PIN login/management, roster, roll call, summary tabs, and unauthorized views.
+- `scripts/` — Local dev stacks (`dev-local.sh`, `dev-stack.sh`) and WAL-safe SQLite backup (`backup-db.sh`).
+- `.github/workflows/ci.yml` — CI pipeline running `go test -race` (enforcing ≥80% coverage), `golangci-lint`, and Docker image build.
 
 ## Common Commands
 All commands should use `Taskfile.yml` or standard Go tools prefixed with `rtk`:

@@ -102,6 +102,28 @@ Configure as variáveis de ambiente:
 | `PIN_SESSION_TTL` | Duração do acesso aberto com o PIN (`24h` por padrão) | `12h` |
 | `DEV_MODE` | `false` em produção | `false` |
 
+### Subindo em produção com HTTPS automático (Docker + Caddy)
+
+```bash
+cp .env.example .env
+# Edite .env com DOMAIN, MATRIX_HOMESERVER_URL, MATRIX_USER_ID e MATRIX_ACCESS_TOKEN
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+O Caddy obtém e renova o certificado TLS automaticamente para `DOMAIN` e faz proxy reverso para o app na rede interna do Docker.
+
+### Backup do banco SQLite
+
+O banco opera em modo WAL (`Write-Ahead Logging`), então não copie o arquivo `.db` diretamente com `cp`. Use o script de backup (que executa `.backup` do SQLite):
+
+```bash
+# Volume Docker de produção
+./scripts/backup-db.sh --docker
+
+# Ou arquivo local
+./scripts/backup-db.sh ./data/frequencia.db ./backups
+```
+
 ---
 
 ## Testes Automatizados & Cobertura
@@ -166,7 +188,14 @@ frequencia-matrix-integration/
 │           ├── summary.html
 │           └── unauthorized.html
 ├── Dockerfile                  # Multi-stage FROM scratch com usuário 10001:10001
-├── docker-compose.yml          # Stack local de testes (App + Conduit + Element)
+├── docker-compose.yml          # Stack local de testes (App + Synapse + Element)
+├── docker-compose.prod.yml     # Stack de produção (App + Caddy com HTTPS automático)
+├── Caddyfile                   # Proxy reverso TLS de produção
+├── .env.example                # Modelo de variáveis de ambiente para produção
+├── scripts/
+│   ├── dev-local.sh            # Stack local no PC
+│   ├── dev-stack.sh            # Stack local com Tailscale (HTTPS)
+│   └── backup-db.sh            # Backup seguro do SQLite em modo WAL
 ├── Taskfile.yml                # Comandos de teste, build e lint
 └── README.md
 ```

@@ -1,0 +1,6 @@
+# Production reverse proxy with automatic HTTPS (Let's Encrypt).
+# X-Frame-Options is intentionally omitted because Element embeds this app in an iframe.
+{$DOMAIN} {
+	encode gzip zstd
+	reverse_proxy frequencia:8080
+}
